@@ -1,164 +1,79 @@
 /**
- * Service xử lý CRUD cho Mục tiêu tiết kiệm (Savings Goals)
- * Collection: users/{userId}/goals/{goalId}
+ * goalService - Mục tiêu tiết kiệm. BE: /api/v1/goals
+ * Map field BE (targetAmountVnd/currentAmountVnd) <-> FE (targetAmount/currentAmount).
  */
+import apiClient from "./apiClient";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "./firebase";
-
-/**
- * Lấy reference đến collection goals của user
- * @param {string} userId - ID của user
- * @returns {CollectionReference} Reference đến collection
- */
-const getGoalsCollection = (userId) => {
-  return collection(db, "users", userId, "goals");
-};
-
-/**
- * Lắng nghe realtime thay đổi của goals
- * @param {string} userId - ID của user
- * @param {Function} onSuccess - Callback khi có data
- * @param {Function} onError - Callback khi có lỗi
- * @returns {Function} Unsubscribe function
- */
-export const subscribeToGoals = (userId, onSuccess, onError) => {
-  const goalsRef = getGoalsCollection(userId);
-  const q = query(goalsRef, orderBy("createdAt", "desc"));
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const goals = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      onSuccess(goals);
-    },
-    (error) => {
-      console.error("Lỗi khi lắng nghe goals:", error);
-      onError(error);
-    }
-  );
-};
-
-/**
- * Tạo mục tiêu mới
- * @param {string} userId - ID của user
- * @param {Object} goalData - Dữ liệu mục tiêu
- * @returns {Promise<string>} ID của mục tiêu vừa tạo
- */
-export const createGoal = async (userId, goalData) => {
-  const goalsRef = getGoalsCollection(userId);
-
-  const newGoal = {
-    ...goalData,
-    currentAmount: goalData.currentAmount || 0,
-    status: "active", // active, completed, cancelled
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+/** BE goal -> shape FE đang dùng. */
+function mapGoal(g) {
+  if (!g) return null;
+  return {
+    ...g,
+    targetAmount: Number(g.targetAmountVnd ?? 0),
+    currentAmount: Number(g.currentAmountVnd ?? 0),
+    deadline: g.deadline || null,
   };
+}
 
-  const docRef = await addDoc(goalsRef, newGoal);
-  return docRef.id;
-};
-
-/**
- * Cập nhật mục tiêu
- * @param {string} userId - ID của user
- * @param {string} goalId - ID của mục tiêu
- * @param {Object} updates - Dữ liệu cần cập nhật
- */
-export const updateGoal = async (userId, goalId, updates) => {
-  const goalRef = doc(db, "users", userId, "goals", goalId);
-
-  await updateDoc(goalRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
+export const getGoals = async (ledgerId, status) => {
+  const data = await apiClient.get("/goals", {
+    query: { ledgerId, ...(status ? { status } : {}) },
   });
+  return (data.goals || []).map(mapGoal);
 };
 
-/**
- * Thêm tiền vào mục tiêu (Bỏ tiết kiệm)
- * @param {string} userId - ID của user
- * @param {string} goalId - ID của mục tiêu
- * @param {number} amount - Số tiền thêm vào
- * @param {number} currentTotal - Tổng tiền hiện tại
- * @param {number} targetAmount - Mục tiêu cần đạt
- */
-export const addMoneyToGoal = async (
-  userId,
-  goalId,
-  amount,
-  currentTotal,
-  targetAmount
-) => {
-  const newTotal = currentTotal + amount;
-  const updates = {
-    currentAmount: newTotal,
+export const createGoal = async (ledgerId, goalData) => {
+  const payload = {
+    ledgerId,
+    name: goalData.name,
+    targetAmountVnd: Math.round(Number(goalData.targetAmount)),
+    ...(goalData.currentAmount
+      ? { currentAmountVnd: Math.round(Number(goalData.currentAmount)) }
+      : {}),
+    deadline: goalData.deadline || null,
+    icon: goalData.icon || null,
+    color: goalData.color || null,
   };
-
-  // Tự động đánh dấu hoàn thành nếu đạt mục tiêu
-  if (newTotal >= targetAmount) {
-    updates.status = "completed";
-    updates.completedAt = serverTimestamp();
-  }
-
-  await updateGoal(userId, goalId, updates);
+  const data = await apiClient.post("/goals", payload);
+  return mapGoal(data.goal);
 };
 
-/**
- * Xóa mục tiêu
- * @param {string} userId - ID của user
- * @param {string} goalId - ID của mục tiêu
- */
-export const deleteGoal = async (userId, goalId) => {
-  const goalRef = doc(db, "users", userId, "goals", goalId);
-  await deleteDoc(goalRef);
+export const updateGoal = async (goalId, updates) => {
+  const payload = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.targetAmount !== undefined)
+    payload.targetAmountVnd = Math.round(Number(updates.targetAmount));
+  if (updates.currentAmount !== undefined)
+    payload.currentAmountVnd = Math.round(Number(updates.currentAmount));
+  if (updates.deadline !== undefined) payload.deadline = updates.deadline || null;
+  if (updates.icon !== undefined) payload.icon = updates.icon;
+  if (updates.color !== undefined) payload.color = updates.color;
+  if (updates.status !== undefined) payload.status = updates.status;
+  const data = await apiClient.patch(`/goals/${goalId}`, payload);
+  return mapGoal(data.goal);
 };
 
-/**
- * Icon mặc định cho mục tiêu
- */
+/** Nạp tiền vào mục tiêu (BE tự đánh dấu hoàn thành khi đạt target). */
+export const addMoneyToGoal = async (goalId, amount) => {
+  const data = await apiClient.post(`/goals/${goalId}/deposits`, {
+    amountVnd: Math.round(Number(amount)),
+  });
+  return mapGoal(data.goal);
+};
+
+export const deleteGoal = async (goalId) => {
+  const data = await apiClient.delete(`/goals/${goalId}`);
+  return mapGoal(data.goal);
+};
+
+/** Icon mặc định cho mục tiêu */
 export const DEFAULT_GOAL_ICONS = [
-  "🎯",
-  "📱",
-  "💻",
-  "🏠",
-  "🚗",
-  "✈️",
-  "🎓",
-  "💍",
-  "👶",
-  "🏥",
-  "🎸",
-  "📸",
-  "🎮",
-  "👗",
-  "⌚",
-  "🎁",
+  "🎯", "📱", "💻", "🏠", "🚗", "✈️", "🎓", "💍",
+  "👶", "🏥", "🎸", "📸", "🎮", "👗", "⌚", "🎁",
 ];
 
-/**
- * Màu mặc định cho mục tiêu
- */
+/** Màu mặc định cho mục tiêu */
 export const DEFAULT_GOAL_COLORS = [
-  "#3B82F6",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#EC4899",
-  "#06B6D4",
-  "#84CC16",
+  "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
+  "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16",
 ];

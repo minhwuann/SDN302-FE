@@ -1,109 +1,142 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
-import { auth } from "../services/firebase";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import * as authApi from "../services/authApi";
+import { hasSession, getCachedUser } from "../services/tokenStore";
+import { AUTH_LOGOUT_EVENT } from "../services/apiClient";
 
 /**
- * Context type cho Authentication
+ * AuthContext - Quản lý xác thực dựa trên JWT của Backend Ví Vi Vu.
+ * (Thay thế hoàn toàn Firebase Auth.)
+ *
  * @typedef {Object} AuthContextType
- * @property {import('firebase/auth').User | null} currentUser - User hiện tại đang đăng nhập (null nếu chưa đăng nhập)
- * @property {boolean} loading - Trạng thái đang tải (true khi đang kiểm tra auth state)
- * @property {Function} logout - Hàm để đăng xuất user
+ * @property {Object|null} currentUser - User đã chuẩn hoá (có .uid, .email, .displayName, .photoURL)
+ * @property {boolean} loading - Đang kiểm tra phiên đăng nhập
+ * @property {Object|null} settings - User settings từ BE
+ * @property {Object|null} defaultLedger - Sổ mặc định từ BE
  */
 
 const AuthContext = createContext(null);
 
-// Thời gian tối đa của một phiên đăng nhập (3 tiếng)
-const SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000;
-
-/**
- * Provider component để quản lý authentication state cho toàn bộ ứng dụng
- * Sử dụng onAuthStateChanged để lắng nghe thay đổi trạng thái đăng nhập
- */
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => getCachedUser());
+  const [settings, setSettings] = useState(null);
+  const [defaultLedger, setDefaultLedger] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * Effect để lắng nghe thay đổi trạng thái đăng nhập
-   * onAuthStateChanged sẽ tự động gọi callback mỗi khi user đăng nhập/đăng xuất
-   */
-  useEffect(() => {
-    // Lắng nghe thay đổi trạng thái đăng nhập
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Kiểm tra thời gian hết hạn session (3 tiếng)
-        const lastSignInTime = new Date(user.metadata.lastSignInTime).getTime();
-        const currentTime = Date.now();
-
-        if (currentTime - lastSignInTime > SESSION_TIMEOUT_MS) {
-          console.warn(
-            "Phiên đăng nhập hết hạn (quá 3 tiếng). Đang đăng xuất..."
-          );
-
-          await signOut(auth);
-          setCurrentUser(null);
-        } else {
-          setCurrentUser(user);
-        }
-      } else {
-        setCurrentUser(null);
-      }
-      setLoading(false); // Đã hoàn tất kiểm tra auth state
-    });
-
-    // Cleanup: Hủy đăng ký listener khi component unmount
-    return () => unsubscribe();
+  /** Tải lại thông tin user hiện tại từ BE để xác thực phiên. */
+  const refreshUser = useCallback(async () => {
+    if (!hasSession()) {
+      setCurrentUser(null);
+      setLoading(false);
+      return null;
+    }
+    try {
+      const { user, settings: s, defaultLedger: dl } = await authApi.fetchMe();
+      setCurrentUser(user);
+      setSettings(s);
+      setDefaultLedger(dl);
+      return user;
+    } catch {
+      // Token không hợp lệ / không refresh được -> coi như đã đăng xuất
+      setCurrentUser(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  /**
-   * Hàm đăng xuất user
-   * Gọi signOut từ Firebase Auth để đăng xuất
-   * onAuthStateChanged sẽ tự động cập nhật currentUser về null
-   *
-   * @returns {Promise<void>}
-   */
-  const logout = async () => {
-    try {
-      await signOut(auth);
-      // onAuthStateChanged sẽ tự động cập nhật currentUser về null
-    } catch (error) {
-      console.error("Lỗi khi đăng xuất:", error);
-      throw error;
-    }
-  };
+  // Kiểm tra phiên khi khởi động app
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
-  /**
-   * Cập nhật thông tin profile của user (displayName, photoURL)
-   * @param {Object} data - Dữ liệu cần cập nhật { displayName, photoURL }
-   */
-  const updateUserProfile = async (data) => {
-    if (!auth.currentUser) return;
-    try {
-      await updateProfile(auth.currentUser, data);
-      // Force update user state logic if needed, but onAuthStateChanged might handle it
-      // or we manually update local state to reflect changes immediately
-      setCurrentUser({ ...auth.currentUser, ...data });
-    } catch (error) {
-      console.error("Lỗi khi cập nhật profile:", error);
-      throw error;
-    }
-  };
+  // Lắng nghe sự kiện logout phát ra từ apiClient khi refresh token thất bại
+  useEffect(() => {
+    const onForcedLogout = () => {
+      setCurrentUser(null);
+      setSettings(null);
+      setDefaultLedger(null);
+    };
+    window.addEventListener(AUTH_LOGOUT_EVENT, onForcedLogout);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, onForcedLogout);
+  }, []);
+
+  /* ----------------------------- Auth actions ----------------------------- */
+
+  const loginWithEmail = useCallback(async (credentials) => {
+    const user = await authApi.loginEmail(credentials);
+    setCurrentUser(user);
+    // Lấy thêm settings + ledger mặc định ngay sau khi đăng nhập
+    await authApi.fetchMe().then(({ settings: s, defaultLedger: dl }) => {
+      setSettings(s);
+      setDefaultLedger(dl);
+    });
+    return user;
+  }, []);
+
+  const verifyOtp = useCallback(async (payload) => {
+    const user = await authApi.verifyEmailOtp(payload);
+    setCurrentUser(user);
+    await authApi.fetchMe().then(({ settings: s, defaultLedger: dl }) => {
+      setSettings(s);
+      setDefaultLedger(dl);
+    });
+    return user;
+  }, []);
+
+  const loginWithGoogle = useCallback(async (idToken) => {
+    const user = await authApi.loginWithGoogle(idToken);
+    setCurrentUser(user);
+    await authApi.fetchMe().then(({ settings: s, defaultLedger: dl }) => {
+      setSettings(s);
+      setDefaultLedger(dl);
+    });
+    return user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await authApi.logout();
+    setCurrentUser(null);
+    setSettings(null);
+    setDefaultLedger(null);
+  }, []);
+
+  /** Cập nhật hồ sơ (displayName, avatarUrl). Tương thích chữ ký cũ. */
+  const updateUserProfile = useCallback(async (data) => {
+    const payload = {};
+    if (data.displayName !== undefined) payload.displayName = data.displayName;
+    if (data.photoURL !== undefined) payload.avatarUrl = data.photoURL;
+    if (data.avatarUrl !== undefined) payload.avatarUrl = data.avatarUrl;
+    const { user, settings: s } = await authApi.updateMe(payload);
+    setCurrentUser(user);
+    if (s) setSettings(s);
+    return user;
+  }, []);
 
   const value = {
     currentUser,
     loading,
+    settings,
+    defaultLedger,
+    refreshUser,
+    loginWithEmail,
+    verifyOtp,
+    loginWithGoogle,
     logout,
     updateUserProfile,
+    // Đăng ký/OTP không đổi state nên dùng trực tiếp từ authApi
+    register: authApi.registerEmail,
+    resendOtp: authApi.resendEmailOtp,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-/**
- * Hook để sử dụng AuthContext trong các components
- * @returns {AuthContextType} Object chứa currentUser và loading state
- * @throws {Error} Nếu hook được gọi bên ngoài AuthProvider
- */
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);

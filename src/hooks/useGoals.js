@@ -1,138 +1,114 @@
 /**
- * Hook quản lý Mục tiêu tiết kiệm (Savings Goals)
- * Xử lý state, loading, và các operations CRUD
+ * useGoals - Mục tiêu tiết kiệm (Savings Goals) qua Backend REST.
+ * Dùng sổ hiện tại (currentLedger) từ TransactionsContext.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTransactionsContext } from "../contexts/TransactionsContext";
 import {
-  subscribeToGoals,
+  getGoals,
   createGoal,
   updateGoal,
   addMoneyToGoal,
   deleteGoal,
 } from "../services/goalService";
 
-/**
- * Hook xử lý logic cho Mục tiêu tiết kiệm
- * @returns {Object} State và các hàm xử lý goals
- */
 export const useGoals = () => {
   const { currentUser } = useAuth();
+  const { currentLedger } = useTransactionsContext();
+  const ledgerId = currentLedger?.id;
+
   const [goals, setGoals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Lắng nghe realtime changes từ Firestore
+  const reload = useCallback(async () => {
+    if (!ledgerId) return;
+    const data = await getGoals(ledgerId);
+    setGoals(data);
+  }, [ledgerId]);
+
   useEffect(() => {
-    if (!currentUser) {
-      // Reset state khi user logout - wrap trong queueMicrotask để tránh lint warning
-      // Về bản chất vẫn là cleanup logic hợp lệ
-      queueMicrotask(() => {
-        setGoals([]);
-        setIsLoading(false);
-      });
+    if (!currentUser || !ledgerId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setGoals([]);
+      setIsLoading(false);
       return;
     }
+    let active = true;
+    setIsLoading(true);
+    getGoals(ledgerId)
+      .then((data) => {
+        if (active) {
+          setGoals(data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentUser, ledgerId]);
 
-    // Wrap trong queueMicrotask để tránh lint warning
-    queueMicrotask(() => setIsLoading(true));
-
-    const unsubscribe = subscribeToGoals(
-      currentUser.uid,
-      (fetchedGoals) => {
-        setGoals(fetchedGoals);
-        setIsLoading(false);
-        setError(null);
-      },
-      (err) => {
-        setError(err.message);
-        setIsLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  /**
-   * Tạo mục tiêu mới
-   */
   const handleCreateGoal = useCallback(
     async (goalData) => {
-      if (!currentUser) return;
-
+      if (!ledgerId) return { success: false, error: "Chưa chọn sổ" };
       try {
-        await createGoal(currentUser.uid, goalData);
+        await createGoal(ledgerId, goalData);
+        await reload();
         return { success: true };
       } catch (err) {
-        console.error("Lỗi khi tạo mục tiêu:", err);
         return { success: false, error: err.message };
       }
     },
-    [currentUser]
+    [ledgerId, reload]
   );
 
-  /**
-   * Cập nhật mục tiêu
-   */
   const handleUpdateGoal = useCallback(
     async (goalId, updates) => {
-      if (!currentUser) return;
-
       try {
-        await updateGoal(currentUser.uid, goalId, updates);
+        await updateGoal(goalId, updates);
+        await reload();
         return { success: true };
       } catch (err) {
-        console.error("Lỗi khi cập nhật mục tiêu:", err);
         return { success: false, error: err.message };
       }
     },
-    [currentUser]
+    [reload]
   );
 
-  /**
-   * Thêm tiền vào mục tiêu (Bỏ tiết kiệm)
-   */
   const handleAddMoney = useCallback(
     async (goal, amount) => {
-      if (!currentUser) return;
-
       try {
-        await addMoneyToGoal(
-          currentUser.uid,
-          goal.id,
-          amount,
-          goal.currentAmount,
-          goal.targetAmount
-        );
+        await addMoneyToGoal(goal.id, amount);
+        await reload();
         return { success: true };
       } catch (err) {
-        console.error("Lỗi khi thêm tiền:", err);
         return { success: false, error: err.message };
       }
     },
-    [currentUser]
+    [reload]
   );
 
-  /**
-   * Xóa mục tiêu
-   */
   const handleDeleteGoal = useCallback(
     async (goalId) => {
-      if (!currentUser) return;
-
       try {
-        await deleteGoal(currentUser.uid, goalId);
+        await deleteGoal(goalId);
+        await reload();
         return { success: true };
       } catch (err) {
-        console.error("Lỗi khi xóa mục tiêu:", err);
         return { success: false, error: err.message };
       }
     },
-    [currentUser]
+    [reload]
   );
 
-  // Tính toán thống kê
   const stats = {
     total: goals.length,
     active: goals.filter((g) => g.status === "active").length,

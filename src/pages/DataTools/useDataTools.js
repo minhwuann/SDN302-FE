@@ -1,16 +1,8 @@
 import { useState, useMemo } from "react";
 import { parse, format, isValid } from "date-fns";
-import {
-  writeBatch,
-  collection,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth, googleProvider } from "../../services/firebase";
-import { db } from "../../services/firebase";
+import { getGoogleAccessToken } from "../../services/googleAuth";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTransactionsContext } from "../../contexts/TransactionsContext";
 import {
@@ -36,7 +28,7 @@ import { exportToPDF } from "../../utils/exportUtils";
  */
 export const useDataTools = () => {
   const { currentUser } = useAuth();
-  const { transactions, currentLedger } = useTransactionsContext();
+  const { transactions, bulkAddTransactions } = useTransactionsContext();
 
   const [rawData, setRawData] = useState("");
   const [parsedData, setParsedData] = useState([]);
@@ -353,40 +345,24 @@ export const useDataTools = () => {
     setSaveResult(null);
 
     try {
-      const transactionsRef = collection(
-        db,
-        "users",
-        currentUser.uid,
-        "transactions"
-      );
+      const items = validTransactions.map((item) => ({
+        date: item.date,
+        type: item.type,
+        category: item.category,
+        amount: Number(item.amount),
+        note: item.note || "",
+        paymentMethod: item.paymentMethod || "cash",
+        ...(item.paymentMethod === "transfer" && item.bankName
+          ? { bankName: item.bankName }
+          : {}),
+      }));
 
-      // Sử dụng Batch Write để lưu nhiều document cùng lúc
-      const batch = writeBatch(db);
-
-      validTransactions.forEach((item) => {
-        const docRef = doc(transactionsRef);
-        const transactionData = {
-          userId: currentUser.uid,
-          ledgerId: currentLedger?.id || "main", // Thêm ledgerId để phân biệt sổ thu chi
-          date: item.date,
-          type: item.type,
-          category: item.category,
-          amount: Number(item.amount),
-          note: item.note || "",
-          paymentMethod: item.paymentMethod || "cash",
-          createdAt: serverTimestamp(),
-        };
-
-        batch.set(docRef, transactionData);
-      });
-
-      // Commit batch
-      await batch.commit();
+      const saved = await bulkAddTransactions(items);
 
       setSaveResult({
         success: true,
-        saved: validTransactions.length,
-        total: parsedData.length,
+        saved,
+        total: allData.length,
       });
 
       // Reset sau khi lưu thành công
@@ -548,15 +524,14 @@ export const useDataTools = () => {
     setSheetsExportResult(null);
 
     try {
-      // Bước 1: Đăng nhập lại để lấy access token với scope mới
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
+      // Bước 1: Lấy access token (scope drive.file) qua Google Identity Services
+      const accessToken = await getGoogleAccessToken(
+        "https://www.googleapis.com/auth/drive.file"
+      );
 
-      if (!credential || !credential.accessToken) {
+      if (!accessToken) {
         throw new Error("Không thể lấy access token. Vui lòng thử lại.");
       }
-
-      const accessToken = credential.accessToken;
 
       // Bước 2: Tạo spreadsheet mới (tên tự động: "Bảng thống kê thu chi - dd/MM/yyyy")
       const spreadsheetInfo = await createSpreadsheet(accessToken);

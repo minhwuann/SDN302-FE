@@ -1,74 +1,72 @@
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  orderBy,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "./firebase";
-
 /**
- * Service layer cho Challenges (Thử thách Tiết kiệm)
- * Xử lý CRUD operations với Firestore
+ * challengesService - Thử thách tiết kiệm. BE: /api/v1/challenges
+ *
+ * Lưu ý mô hình: BE chỉ lưu name/targetAmountVnd/startDate/endDate + tiến độ
+ * (currentAmountVnd, streakDays) cập nhật qua check-in. Các field UI bổ sung
+ * (description, dailyTarget, type) không được BE lưu.
+ *   FE title <-> BE name; FE targetAmount/currentAmount <-> *Vnd
  */
+import apiClient from "./apiClient";
 
-const COLLECTION_NAME = "challenges";
+const today = () => new Date().toISOString().slice(0, 10);
 
-/**
- * Lấy collection reference cho challenges của user
- */
-const getChallengesCollection = (userId) => {
-  return collection(db, "users", userId, COLLECTION_NAME);
-};
-
-/**
- * Lấy tất cả challenges của user
- */
-export const getChallenges = async (userId) => {
-  const ref = getChallengesCollection(userId);
-  const q = query(ref, orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
-};
-
-/**
- * Tạo challenge mới
- */
-export const createChallenge = async (userId, challengeData) => {
-  const ref = getChallengesCollection(userId);
-
-  const newChallenge = {
-    ...challengeData,
-    currentAmount: 0,
-    streakDays: 0,
-    status: "active",
-    createdAt: serverTimestamp(),
+function mapChallenge(c) {
+  if (!c) return null;
+  return {
+    ...c,
+    title: c.name,
+    description: c.description || "",
+    targetAmount: Number(c.targetAmountVnd ?? 0),
+    currentAmount: Number(c.currentAmountVnd ?? 0),
+    streakDays: Number(c.streakDays ?? 0),
   };
+}
 
-  const docRef = await addDoc(ref, newChallenge);
-  return docRef.id;
+export const getChallenges = async (ledgerId, status) => {
+  const data = await apiClient.get("/challenges", {
+    query: { ledgerId, ...(status ? { status } : {}) },
+  });
+  return (data.challenges || []).map(mapChallenge);
 };
 
-/**
- * Cập nhật challenge
- */
-export const updateChallenge = async (userId, challengeId, updates) => {
-  const docRef = doc(db, "users", userId, COLLECTION_NAME, challengeId);
-  await updateDoc(docRef, updates);
+export const createChallenge = async (ledgerId, challengeData) => {
+  const payload = {
+    ledgerId,
+    name: challengeData.title || challengeData.name,
+    startDate: challengeData.startDate,
+    endDate: challengeData.endDate,
+  };
+  if (challengeData.targetAmount) {
+    payload.targetAmountVnd = Math.round(Number(challengeData.targetAmount));
+  }
+  const data = await apiClient.post("/challenges", payload);
+  return mapChallenge(data.challenge);
 };
 
-/**
- * Xóa challenge
- */
-export const deleteChallenge = async (userId, challengeId) => {
-  const docRef = doc(db, "users", userId, COLLECTION_NAME, challengeId);
-  await deleteDoc(docRef);
+export const updateChallenge = async (challengeId, updates) => {
+  const payload = {};
+  if (updates.title !== undefined) payload.name = updates.title;
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.targetAmount !== undefined)
+    payload.targetAmountVnd = Math.round(Number(updates.targetAmount));
+  if (updates.startDate !== undefined) payload.startDate = updates.startDate;
+  if (updates.endDate !== undefined) payload.endDate = updates.endDate;
+  if (updates.status !== undefined) payload.status = updates.status;
+  const data = await apiClient.patch(`/challenges/${challengeId}`, payload);
+  return mapChallenge(data.challenge);
+};
+
+/** Check-in một ngày cho thử thách (cộng tiến độ + streak). */
+export const checkInChallenge = async (challengeId, amount, checkinDate, note) => {
+  const data = await apiClient.post(`/challenges/${challengeId}/checkins`, {
+    checkinDate: checkinDate || today(),
+    amountVnd: Math.round(Number(amount || 0)),
+    ...(note ? { note } : {}),
+  });
+  return data;
+};
+
+export const deleteChallenge = async (challengeId) => {
+  const data = await apiClient.delete(`/challenges/${challengeId}`);
+  return mapChallenge(data.challenge);
 };

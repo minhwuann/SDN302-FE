@@ -1,124 +1,88 @@
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  orderBy,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "./firebase";
-
 /**
- * Service layer cho Debts (Món Nợ)
- * Xử lý CRUD operations với Firestore
+ * debtsService - Khoản nợ (vay/cho vay). BE: /api/v1/debts
+ *
+ * Map field:
+ *   FE type 'borrow' <-> BE direction 'borrowed'
+ *   FE type 'lend'   <-> BE direction 'lent'
+ *   personName <-> counterpartyName, amount <-> amountVnd,
+ *   remainingAmount <-> remainingAmountVnd, reason <-> note
  */
+import apiClient from "./apiClient";
 
-const COLLECTION_NAME = "debts";
+const toDirection = (type) => (type === "lend" ? "lent" : "borrowed");
+const toType = (direction) => (direction === "lent" ? "lend" : "borrow");
+const today = () => new Date().toISOString().slice(0, 10);
 
-/**
- * Lấy collection reference cho debts của user
- * @param {string} userId - ID của user hiện tại
- * @returns {CollectionReference} Firestore collection reference
- */
-const getDebtsCollection = (userId) => {
-  return collection(db, "users", userId, COLLECTION_NAME);
-};
-
-/**
- * Lấy tất cả debts của user
- * @param {string} userId - ID của user
- * @returns {Promise<Array>} Danh sách debts
- */
-export const getDebts = async (userId) => {
-  const debtsRef = getDebtsCollection(userId);
-  const q = query(debtsRef, orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
-};
-
-/**
- * Tạo debt mới
- * @param {string} userId - ID của user
- * @param {Object} debtData - Dữ liệu debt
- * @returns {Promise<string>} ID của debt mới
- */
-export const createDebt = async (userId, debtData) => {
-  const debtsRef = getDebtsCollection(userId);
-
-  const newDebt = {
-    ...debtData,
-    remainingAmount: debtData.amount, // Ban đầu còn nợ = tổng nợ
-    status: "active",
-    createdAt: serverTimestamp(),
+function mapDebt(d) {
+  if (!d) return null;
+  return {
+    ...d,
+    type: toType(d.direction),
+    personName: d.counterpartyName,
+    amount: Number(d.amountVnd ?? 0),
+    remainingAmount: Number(d.remainingAmountVnd ?? 0),
+    reason: d.note || "",
+    dueDate: d.dueDate || null,
   };
+}
 
-  const docRef = await addDoc(debtsRef, newDebt);
-  return docRef.id;
-};
-
-/**
- * Cập nhật debt
- * @param {string} userId - ID của user
- * @param {string} debtId - ID của debt
- * @param {Object} updates - Các field cần update
- */
-export const updateDebt = async (userId, debtId, updates) => {
-  const debtRef = doc(db, "users", userId, COLLECTION_NAME, debtId);
-  await updateDoc(debtRef, updates);
-};
-
-/**
- * Ghi nhận thanh toán một phần
- * @param {string} userId - ID của user
- * @param {string} debtId - ID của debt
- * @param {number} paymentAmount - Số tiền trả
- * @param {number} currentRemaining - Số tiền còn lại hiện tại
- */
-export const recordPayment = async (
-  userId,
-  debtId,
-  paymentAmount,
-  currentRemaining
-) => {
-  const newRemaining = currentRemaining - paymentAmount;
-
-  const updates = {
-    remainingAmount: newRemaining,
-    status: newRemaining <= 0 ? "paid" : "active",
-  };
-
-  await updateDebt(userId, debtId, updates);
-};
-
-/**
- * Xóa debt
- * @param {string} userId - ID của user
- * @param {string} debtId - ID của debt
- */
-export const deleteDebt = async (userId, debtId) => {
-  const debtRef = doc(db, "users", userId, COLLECTION_NAME, debtId);
-  await deleteDoc(debtRef);
-};
-
-/**
- * Kiểm tra và cập nhật trạng thái quá hạn
- * @param {Array} debts - Danh sách debts
- * @returns {Array} Danh sách debts đã cập nhật status
- */
-export const checkOverdueDebts = (debts) => {
-  const today = new Date().toISOString().split("T")[0];
-
-  return debts.map((debt) => {
-    if (debt.status === "active" && debt.dueDate && debt.dueDate < today) {
-      return { ...debt, status: "overdue" };
-    }
-    return debt;
+export const getDebts = async (ledgerId, status) => {
+  const data = await apiClient.get("/debts", {
+    query: { ledgerId, ...(status ? { status } : {}) },
   });
+  return (data.debts || []).map(mapDebt);
+};
+
+export const createDebt = async (ledgerId, debtData) => {
+  const payload = {
+    ledgerId,
+    direction: toDirection(debtData.type),
+    counterpartyName: debtData.personName,
+    amountVnd: Math.round(Number(debtData.amount)),
+    dueDate: debtData.dueDate || null,
+    note: debtData.reason || null,
+  };
+  const data = await apiClient.post("/debts", payload);
+  return mapDebt(data.debt);
+};
+
+export const updateDebt = async (debtId, updates) => {
+  const payload = {};
+  if (updates.type !== undefined) payload.direction = toDirection(updates.type);
+  if (updates.personName !== undefined)
+    payload.counterpartyName = updates.personName;
+  if (updates.amount !== undefined)
+    payload.amountVnd = Math.round(Number(updates.amount));
+  if (updates.remainingAmount !== undefined)
+    payload.remainingAmountVnd = Math.round(Number(updates.remainingAmount));
+  if (updates.reason !== undefined) payload.note = updates.reason || null;
+  if (updates.dueDate !== undefined) payload.dueDate = updates.dueDate || null;
+  if (updates.status !== undefined) payload.status = updates.status;
+  const data = await apiClient.patch(`/debts/${debtId}`, payload);
+  return mapDebt(data.debt);
+};
+
+/** Ghi nhận một lần thanh toán nợ. */
+export const payDebt = async (debtId, amount, paidAt, note) => {
+  const data = await apiClient.post(`/debts/${debtId}/payments`, {
+    amountVnd: Math.round(Number(amount)),
+    paidAt: paidAt || today(),
+    ...(note ? { note } : {}),
+  });
+  return { payment: data.payment, debt: mapDebt(data.debt) };
+};
+
+export const deleteDebt = async (debtId) => {
+  const data = await apiClient.delete(`/debts/${debtId}`);
+  return mapDebt(data.debt);
+};
+
+/** Đánh dấu quá hạn ở client (BE cũng có thể tính, đây chỉ là hiển thị). */
+export const checkOverdueDebts = (debts) => {
+  const t = today();
+  return debts.map((debt) =>
+    debt.status === "active" && debt.dueDate && debt.dueDate < t
+      ? { ...debt, status: "overdue" }
+      : debt
+  );
 };

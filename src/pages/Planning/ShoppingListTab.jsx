@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardBody,
@@ -13,122 +13,103 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Spinner,
   useDisclosure,
 } from "@heroui/react";
-import {
-  Plus,
-  ShoppingCart,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
-  ShoppingBag,
-  TrendingUp,
-} from "lucide-react";
+import { Plus, ShoppingCart, Trash2, ShoppingBag } from "lucide-react";
 import { useTransactionsContext } from "../../contexts/TransactionsContext";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  doc,
-  collection,
-  onSnapshot,
-  setDoc,
-  deleteDoc,
-  updateDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "../../services/firebase";
+import * as shoppingApi from "../../services/shoppingApi";
 import { formatCurrency } from "../../utils/formatCurrency";
 
 /**
- * Parse amount string với hỗ trợ "k" (nghìn) và "m" (triệu)
- * Ví dụ: "55k" -> 55000, "1.5m" -> 1500000, "100000" -> 100000
- * @param {string|number} input
- * @returns {number}
+ * Parse amount string với hỗ trợ "k"/"m". "55k" -> 55000, "1.5m" -> 1500000.
  */
 const parseVNDAmount = (input) => {
   if (typeof input === "number") return input;
   if (!input) return 0;
-
   const str = String(input).toLowerCase().trim();
-
-  // Check for "k" suffix (nghìn)
   if (str.endsWith("k")) {
     const num = parseFloat(str.slice(0, -1).replace(/,/g, "."));
     return isNaN(num) ? 0 : Math.round(num * 1000);
   }
-
-  // Check for "m" suffix (triệu)
   if (str.endsWith("m")) {
     const num = parseFloat(str.slice(0, -1).replace(/,/g, "."));
     return isNaN(num) ? 0 : Math.round(num * 1000000);
   }
-
-  // Parse số bình thường (loại bỏ dấu chấm phân cách)
   const cleaned = str.replace(/[^\d]/g, "");
   return parseInt(cleaned, 10) || 0;
 };
 
 /**
- * Component ShoppingListTab - Sổ Tay Mua Sắm
- * Cho phép lên kế hoạch mua sắm và theo dõi ngân sách dự kiến
+ * ShoppingListTab - Sổ Tay Mua Sắm (qua Backend REST).
  */
 const ShoppingListTab = () => {
   const { currentUser } = useAuth();
-  const { addTransaction } = useTransactionsContext();
+  const { addTransaction, currentLedger } = useTransactionsContext();
+  const ledgerId = currentLedger?.id;
 
-  // State quản lý danh sách các Plan
   const [plans, setPlans] = useState([]);
-  const [activePlan, setActivePlan] = useState(null); // Plan đang chọn để xem chi tiết
+  const [activePlan, setActivePlan] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Modal State
-  const { isOpen, onOpen, onOpenChange } = useDisclosure(); // Modal tạo Plan mới
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [newPlanName, setNewPlanName] = useState("");
   const [newPlanBudget, setNewPlanBudget] = useState("");
 
-  // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState(null);
 
-  // Loading real-time data
+  const fetchPlans = useCallback(async () => {
+    if (!ledgerId) {
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await shoppingApi.listPlans(ledgerId);
+      setPlans(data);
+    } catch (e) {
+      console.error("Lỗi tải kế hoạch mua sắm:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [ledgerId]);
+
   useEffect(() => {
     if (!currentUser) return;
-    const q = collection(db, "users", currentUser.uid, "shopping_plans");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const plansData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      // Sort theo ngày tạo mới nhất
-      plansData.sort(
-        (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-      );
-      setPlans(plansData);
+    fetchPlans();
+  }, [currentUser, fetchPlans]);
 
-      // Nếu đang xem 1 plan, cập nhật lại data của nó
-      setActivePlan((prevPlan) => {
-        if (!prevPlan) return null;
-        const updated = plansData.find((p) => p.id === prevPlan.id);
-        return updated || null;
-      });
-    });
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  // Actions
-  const handleCreatePlan = async () => {
-    if (!newPlanName || !newPlanBudget) return;
+  /** Mở chi tiết 1 plan (tải kèm items). */
+  const openPlan = async (planId) => {
     try {
-      const newRef = doc(
-        collection(db, "users", currentUser.uid, "shopping_plans")
+      const detail = await shoppingApi.getPlan(planId);
+      setActivePlan(detail);
+    } catch (e) {
+      console.error("Lỗi mở kế hoạch:", e);
+    }
+  };
+
+  const refreshActivePlan = useCallback(async () => {
+    if (!activePlan) return;
+    const detail = await shoppingApi.getPlan(activePlan.id);
+    setActivePlan(detail);
+  }, [activePlan]);
+
+  const handleCreatePlan = async () => {
+    if (!newPlanName || !newPlanBudget || !ledgerId) return;
+    try {
+      await shoppingApi.createPlan(
+        ledgerId,
+        newPlanName,
+        parseVNDAmount(newPlanBudget)
       );
-      await setDoc(newRef, {
-        name: newPlanName,
-        budget: parseVNDAmount(newPlanBudget),
-        items: [], // { id, name, price, isBought }
-        createdAt: serverTimestamp(),
-      });
       onOpenChange(false);
       setNewPlanName("");
       setNewPlanBudget("");
+      await fetchPlans();
     } catch (e) {
       console.error("Lỗi tạo plan:", e);
     }
@@ -137,10 +118,9 @@ const ShoppingListTab = () => {
   const handleDeletePlan = async () => {
     if (!planToDelete) return;
     try {
-      await deleteDoc(
-        doc(db, "users", currentUser.uid, "shopping_plans", planToDelete)
-      );
+      await shoppingApi.deletePlan(planToDelete);
       if (activePlan?.id === planToDelete) setActivePlan(null);
+      await fetchPlans();
     } catch (e) {
       console.error("Lỗi xóa plan:", e);
     } finally {
@@ -156,39 +136,18 @@ const ShoppingListTab = () => {
 
   const handleAddItem = async (name, price) => {
     if (!activePlan) return;
-    const newItem = {
-      id: Date.now().toString(),
-      name,
-      price: parseVNDAmount(price),
-      isBought: false,
-    };
-    const updatedItems = [...activePlan.items, newItem];
-    await updateDoc(
-      doc(db, "users", currentUser.uid, "shopping_plans", activePlan.id),
-      {
-        items: updatedItems,
-      }
-    );
+    await shoppingApi.addItem(activePlan.id, name, parseVNDAmount(price));
+    await refreshActivePlan();
   };
 
   const handleToggleItem = async (itemId, isChecked) => {
     if (!activePlan) return;
-    const updatedItems = activePlan.items.map((item) => {
-      if (item.id === itemId) return { ...item, isBought: isChecked };
-      return item;
-    });
+    const item = activePlan.items.find((i) => i.id === itemId);
+    await shoppingApi.updateItem(itemId, { isBought: isChecked });
+    await refreshActivePlan();
 
-    await updateDoc(
-      doc(db, "users", currentUser.uid, "shopping_plans", activePlan.id),
-      {
-        items: updatedItems,
-      }
-    );
-
-    // Nếu checked -> Hỏi user có muốn tạo giao dịch chi tiêu thật không?
-    if (isChecked) {
-      const item = activePlan.items.find((i) => i.id === itemId);
-      // Auto add transaction feature (Optional: could confirm with toast)
+    // Khi tick mua -> tự thêm giao dịch chi tiêu (giữ hành vi cũ)
+    if (isChecked && item) {
       try {
         await addTransaction({
           date: new Date().toISOString().split("T")[0],
@@ -198,7 +157,6 @@ const ShoppingListTab = () => {
           note: `Mua sắm theo kế hoạch: ${activePlan.name} - ${item.name}`,
           paymentMethod: "cash",
         });
-        // alert("Đã tự động thêm vào Sổ Thu Chi!");
       } catch (e) {
         console.error(e);
       }
@@ -207,31 +165,32 @@ const ShoppingListTab = () => {
 
   const handleDeleteItem = async (itemId) => {
     if (!activePlan) return;
-    const updatedItems = activePlan.items.filter((i) => i.id !== itemId);
-    await updateDoc(
-      doc(db, "users", currentUser.uid, "shopping_plans", activePlan.id),
-      {
-        items: updatedItems,
-      }
-    );
+    await shoppingApi.deleteItem(itemId);
+    await refreshActivePlan();
   };
 
-  // Render logic
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spinner size="lg" label="Đang tải..." />
+      </div>
+    );
+  }
+
   const renderPlanDetail = () => {
     if (!activePlan) return null;
-
-    const totalEstimated = activePlan.items.reduce(
-      (sum, i) => sum + i.price,
-      0
-    );
-    const totalBought = activePlan.items
+    const items = activePlan.items || [];
+    const totalEstimated = items.reduce((sum, i) => sum + i.price, 0);
+    const totalBought = items
       .filter((i) => i.isBought)
       .reduce((sum, i) => sum + i.price, 0);
     const remainingBudget = activePlan.budget - totalEstimated;
-    const progress = (totalEstimated / activePlan.budget) * 100;
+    const progress = activePlan.budget
+      ? (totalEstimated / activePlan.budget) * 100
+      : 0;
 
     return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Button variant="light" onPress={() => setActivePlan(null)}>
             ← Quay lại
@@ -249,7 +208,6 @@ const ShoppingListTab = () => {
           </Button>
         </div>
 
-        {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg">
             <CardBody className="p-4">
@@ -281,7 +239,6 @@ const ShoppingListTab = () => {
           </Card>
         </div>
 
-        {/* Progress */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-slate-600 dark:text-slate-300 font-medium">
@@ -289,9 +246,7 @@ const ShoppingListTab = () => {
             </span>
             <span
               className={
-                remainingBudget < 0
-                  ? "text-red-500 font-bold"
-                  : "text-slate-500"
+                remainingBudget < 0 ? "text-red-500 font-bold" : "text-slate-500"
               }
             >
               {remainingBudget < 0 ? "Vượt ngân sách!" : "Trong tầm kiểm soát"}
@@ -305,17 +260,15 @@ const ShoppingListTab = () => {
           />
         </div>
 
-        {/* Add Item Form */}
         <AddNewItemForm onAdd={handleAddItem} />
 
-        {/* Item List */}
         <div className="space-y-3">
-          {activePlan.items.length === 0 && (
+          {items.length === 0 && (
             <div className="text-center py-8 text-slate-400">
               Chưa có món nào. Thêm ngay để bắt đầu săn sale!
             </div>
           )}
-          {activePlan.items.map((item) => (
+          {items.map((item) => (
             <div
               key={item.id}
               className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700"
@@ -323,9 +276,7 @@ const ShoppingListTab = () => {
               <div className="flex items-center gap-3">
                 <Checkbox
                   isSelected={item.isBought}
-                  onValueChange={(checked) =>
-                    handleToggleItem(item.id, checked)
-                  }
+                  onValueChange={(checked) => handleToggleItem(item.id, checked)}
                   lineThrough
                   color="success"
                 >
@@ -361,7 +312,6 @@ const ShoppingListTab = () => {
     );
   };
 
-  // Main View: List of Plans
   return (
     <div className="h-full">
       {activePlan ? (
@@ -369,7 +319,6 @@ const ShoppingListTab = () => {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Create New Card */}
             <Card
               isPressable
               onPress={onOpen}
@@ -383,84 +332,75 @@ const ShoppingListTab = () => {
               </div>
             </Card>
 
-            {/* Existing Plans */}
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className="cursor-pointer"
-                onClick={() => setActivePlan(plan)}
-              >
-                <Card className="h-48 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                  <CardHeader className="flex gap-3">
-                    <div className="p-2 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg text-white">
-                      <ShoppingBag size={20} />
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <h3 className="font-bold text-lg text-slate-800 dark:text-white line-clamp-1">
-                        {plan.name}
-                      </h3>
-                      <p className="text-tiny text-slate-400">
-                        {new Date(
-                          plan.createdAt?.seconds * 1000
-                        ).toLocaleDateString("vi-VN")}
-                      </p>
-                    </div>
-                  </CardHeader>
-                  <CardBody className="justify-end pb-4">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-slate-500 text-xs">Ngân sách</span>
-                      <span className="text-lg font-bold text-primary-600">
-                        {formatCurrency(plan.budget)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                      {/* Simple progress bar */}
-                      <div
-                        className="bg-primary-500 h-full"
-                        style={{
-                          width: `${Math.min(
-                            (plan.items?.reduce((s, i) => s + i.price, 0) /
-                              plan.budget) *
-                              100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <Chip size="sm" variant="flat" color="secondary">
-                        {plan.items?.length || 0} món
-                      </Chip>
-                      <Chip
-                        size="sm"
-                        variant="flat"
-                        color={
-                          plan.items?.every((i) => i.isBought) &&
-                          plan.items.length > 0
-                            ? "success"
-                            : "warning"
-                        }
-                      >
-                        {plan.items?.every((i) => i.isBought) &&
-                        plan.items.length > 0
-                          ? "Đã xong"
-                          : "Đang mua"}
-                      </Chip>
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            ))}
+            {plans.map((plan) => {
+              const allBought =
+                plan.itemCount > 0 && plan.boughtCount >= plan.itemCount;
+              return (
+                <div
+                  key={plan.id}
+                  className="cursor-pointer"
+                  onClick={() => openPlan(plan.id)}
+                >
+                  <Card className="h-48 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                    <CardHeader className="flex gap-3">
+                      <div className="p-2 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg text-white">
+                        <ShoppingBag size={20} />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white line-clamp-1">
+                          {plan.name}
+                        </h3>
+                        <p className="text-tiny text-slate-400">
+                          {plan.createdAt
+                            ? new Date(plan.createdAt).toLocaleDateString("vi-VN")
+                            : ""}
+                        </p>
+                      </div>
+                    </CardHeader>
+                    <CardBody className="justify-end pb-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-slate-500 text-xs">Ngân sách</span>
+                        <span className="text-lg font-bold text-primary-600">
+                          {formatCurrency(plan.budget)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-primary-500 h-full"
+                          style={{
+                            width: `${
+                              plan.budget
+                                ? Math.min(
+                                    (plan.estimatedTotal / plan.budget) * 100,
+                                    100
+                                  )
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Chip size="sm" variant="flat" color="secondary">
+                          {plan.itemCount} món
+                        </Chip>
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          color={allBought ? "success" : "warning"}
+                        >
+                          {allBought ? "Đã xong" : "Đang mua"}
+                        </Chip>
+                      </div>
+                    </CardBody>
+                  </Card>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
-        size="sm"
-      >
+      <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen} size="sm">
         <ModalContent>
           <ModalHeader className="flex items-center gap-2 text-danger-500">
             <Trash2 className="w-5 h-5" />
@@ -468,8 +408,8 @@ const ShoppingListTab = () => {
           </ModalHeader>
           <ModalBody>
             <p className="text-gray-600 dark:text-gray-400">
-              Bạn có chắc chắn muốn xóa kế hoạch này? Hành động này không thể
-              hoàn tác.
+              Bạn có chắc chắn muốn xóa kế hoạch này? Hành động này không thể hoàn
+              tác.
             </p>
           </ModalBody>
           <ModalFooter>
@@ -483,7 +423,6 @@ const ShoppingListTab = () => {
         </ModalContent>
       </Modal>
 
-      {/* Modal Import */}
       <CreatePlanModal
         isOpen={isOpen}
         onClose={() => onOpenChange(false)}
@@ -497,19 +436,12 @@ const ShoppingListTab = () => {
   );
 };
 
-// Sub-components
-/**
- * Format số tiền khi nhập (thêm dấu chấm phân cách)
- */
 const formatInputAmount = (value) => {
   const numericValue = String(value).replace(/[^\d]/g, "");
   if (!numericValue) return "";
   return Number(numericValue).toLocaleString("vi-VN");
 };
 
-/**
- * Parse số tiền từ input đã format
- */
 const parseInputAmount = (value) => {
   const numericValue = String(value).replace(/[^\d]/g, "");
   return numericValue || "";
@@ -553,9 +485,7 @@ const CreatePlanModal = ({
                 autoFocus
                 variant="bordered"
                 size="lg"
-                startContent={
-                  <ShoppingCart className="w-4 h-4 text-gray-400" />
-                }
+                startContent={<ShoppingCart className="w-4 h-4 text-gray-400" />}
               />
               <Input
                 label="Ngân sách dự kiến"
@@ -570,9 +500,9 @@ const CreatePlanModal = ({
               />
               <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
                 <p className="text-xs text-orange-700 dark:text-orange-300">
-                  💡 <strong>Gợi ý:</strong> Đặt ngân sách hợp lý để theo dõi
-                  chi tiêu hiệu quả. Bạn có thể thêm danh sách mua sắm sau khi
-                  tạo kế hoạch.
+                  💡 <strong>Gợi ý:</strong> Đặt ngân sách hợp lý để theo dõi chi
+                  tiêu hiệu quả. Bạn có thể thêm danh sách mua sắm sau khi tạo kế
+                  hoạch.
                 </p>
               </div>
             </div>

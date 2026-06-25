@@ -6,18 +6,15 @@ import {
   useCallback,
 } from "react";
 import { useAuth } from "./AuthContext";
-import {
-  getCategories as fetchCategoriesFromFirestore,
-  addCategory as addCategoryToFirestore,
-  updateCategory as updateCategoryInFirestore,
-  deleteCategory as deleteCategoryFromFirestore,
-  DEFAULT_CATEGORIES,
-} from "../services/categoryService";
+import * as categoryApi from "../services/categoryApi";
 
 /**
- * Context để chia sẻ categories giữa các component
- * Cho phép đồng bộ giữa CategoryManager và AddTransactionModal
+ * CategoryContext - Chia sẻ danh mục thu/chi giữa các component.
+ * Dữ liệu lấy từ Backend (/api/v1/categories). BE tự seed danh mục mặc định
+ * cho mỗi user, nên không cần default cứng ở FE.
  */
+
+const EMPTY = { expense: [], income: [], flat: [] };
 
 const CategoryContext = createContext(null);
 
@@ -32,115 +29,78 @@ export const useCategoryContext = () => {
 
 export const CategoryProvider = ({ children }) => {
   const { currentUser, loading: authLoading } = useAuth();
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState(EMPTY);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch categories khi user đăng nhập
-  useEffect(() => {
-    // Chờ auth loading hoàn tất trước
-    if (authLoading) {
-      return;
-    }
+  const reload = useCallback(async () => {
+    const data = await categoryApi.getCategories();
+    setCategories(data);
+    return data;
+  }, []);
 
+  useEffect(() => {
+    if (authLoading) return;
     if (!currentUser) {
-      setCategories(DEFAULT_CATEGORIES);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCategories(EMPTY);
       setIsLoading(false);
       return;
     }
-
-    const fetchCategories = async () => {
-      setIsLoading(true);
-      try {
-        const data = await fetchCategoriesFromFirestore(currentUser.uid);
-        setCategories(data);
-      } catch (error) {
-        console.error("Lỗi fetch categories:", error);
-        setCategories(DEFAULT_CATEGORIES);
-      } finally {
-        setIsLoading(false);
-      }
+    let active = true;
+    setIsLoading(true);
+    reload()
+      .catch((err) => {
+        console.error("Lỗi tải danh mục:", err);
+        if (active) setCategories(EMPTY);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
     };
+  }, [currentUser, authLoading, reload]);
 
-    fetchCategories();
-  }, [currentUser, authLoading]);
-
-  // Actions
+  /**
+   * Thêm danh mục. Giữ chữ ký cũ addCategory(type, category)
+   * với category = { name, icon?, color?, parentId? }.
+   */
   const addCategory = useCallback(
     async (type, category) => {
       if (!currentUser) return;
-      try {
-        const newCat = await addCategoryToFirestore(
-          currentUser.uid,
-          type,
-          category
-        );
-        setCategories((prev) => ({
-          ...prev,
-          [type]: [...prev[type], newCat],
-        }));
-        return newCat;
-      } catch (error) {
-        console.error("Lỗi thêm category:", error);
-        throw error;
-      }
+      const created = await categoryApi.createCategory({ type, ...category });
+      await reload();
+      return created;
     },
-    [currentUser]
+    [currentUser, reload]
   );
 
   const updateCategory = useCallback(
-    async (type, categoryId, updates) => {
+    async (_type, categoryId, updates) => {
       if (!currentUser) return;
-      try {
-        await updateCategoryInFirestore(
-          currentUser.uid,
-          type,
-          categoryId,
-          updates
-        );
-        setCategories((prev) => ({
-          ...prev,
-          [type]: prev[type].map((cat) =>
-            cat.id === categoryId ? { ...cat, ...updates } : cat
-          ),
-        }));
-      } catch (error) {
-        console.error("Lỗi cập nhật category:", error);
-        throw error;
-      }
+      await categoryApi.updateCategory(categoryId, updates);
+      await reload();
     },
-    [currentUser]
+    [currentUser, reload]
   );
 
   const deleteCategory = useCallback(
-    async (type, categoryId) => {
+    async (_type, categoryId) => {
       if (!currentUser) return;
-      try {
-        await deleteCategoryFromFirestore(currentUser.uid, type, categoryId);
-        setCategories((prev) => ({
-          ...prev,
-          [type]: prev[type].filter((cat) => cat.id !== categoryId),
-        }));
-      } catch (error) {
-        console.error("Lỗi xóa category:", error);
-        throw error;
-      }
+      await categoryApi.deleteCategory(categoryId);
+      await reload();
     },
-    [currentUser]
+    [currentUser, reload]
   );
 
-  // Helper: Lấy danh sách tên categories theo type
   const getCategoryNames = useCallback(
-    (type) => {
-      return categories[type]?.map((cat) => cat.name) || [];
-    },
+    (type) => (categories[type] || []).map((cat) => cat.name),
     [categories]
   );
 
-  // Helper: Tìm category object theo tên
   const findCategoryByName = useCallback(
-    (type, name) => {
-      return categories[type]?.find((cat) => cat.name === name);
-    },
+    (type, name) =>
+      (categories[type] || []).find((cat) => cat.name === name) || null,
     [categories]
   );
 
@@ -149,6 +109,7 @@ export const CategoryProvider = ({ children }) => {
     expenseCategories: categories.expense || [],
     incomeCategories: categories.income || [],
     isLoading,
+    reload,
     addCategory,
     updateCategory,
     deleteCategory,

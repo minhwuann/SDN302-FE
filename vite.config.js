@@ -33,20 +33,8 @@ export default defineConfig({
         clientsClaim: true,
         // Cache tất cả assets
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Runtime caching cho API calls
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "firestore-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60, // 1 hour
-              },
-            },
-          },
-        ],
+        // Không cache API động (REST Backend) trong service worker để tránh dữ liệu cũ
+        runtimeCaching: [],
       },
     }),
   ],
@@ -62,11 +50,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom", "react-router-dom"],
-          "firebase-vendor": [
-            "firebase/app",
-            "firebase/auth",
-            "firebase/firestore",
-          ],
           "ui-vendor": ["@heroui/react", "framer-motion", "lucide-react"],
           "chart-vendor": ["recharts"],
           "utils-vendor": ["date-fns", "xlsx", "file-saver"],

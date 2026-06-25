@@ -1,98 +1,102 @@
-import { useState, useEffect } from "react";
-import {
-  collection,
-  query,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "../services/firebase";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTransactionsContext } from "../contexts/TransactionsContext";
+import { useCategoryContext } from "../contexts/CategoryContext";
+import * as budgetApi from "../services/budgetApi";
+
+/** Tháng hiện tại dạng YYYY-MM. */
+const currentMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 /**
- * Custom hook quản lý ngân sách (Budgets) từ Firestore
+ * useBudgets - Ngân sách tháng qua Backend REST.
+ * Ngân sách gắn với sổ hiện tại và tháng hiện tại. Resolve tên danh mục
+ * (UI dùng tên) sang categoryId (BE dùng UUID).
  */
 const useBudgets = () => {
   const { currentUser } = useAuth();
+  const { currentLedger } = useTransactionsContext();
+  const { expenseCategories } = useCategoryContext();
+  const ledgerId = currentLedger?.id;
+  const month = currentMonth();
+
   const [budgets, setBudgets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Lắng nghe thay đổi từ Firestore
+  const reload = useCallback(async () => {
+    if (!ledgerId) return;
+    const data = await budgetApi.listBudgets(ledgerId, month);
+    setBudgets(data);
+  }, [ledgerId, month]);
+
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !ledgerId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBudgets([]);
       setIsLoading(false);
       return;
     }
+    let active = true;
+    setIsLoading(true);
+    budgetApi
+      .listBudgets(ledgerId, month)
+      .then((data) => active && setBudgets(data))
+      .catch((e) => console.error("Lỗi tải ngân sách:", e))
+      .finally(() => active && setIsLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [currentUser, ledgerId, month]);
 
-    const budgetsRef = collection(db, "users", currentUser.uid, "budgets");
-    const q = query(budgetsRef, orderBy("createdAt", "desc"));
+  /** Tìm categoryId (danh mục chi cha) theo tên. */
+  const resolveCategoryId = useCallback(
+    (name) => {
+      const found = expenseCategories.find(
+        (c) => c.name?.toLowerCase() === (name || "").toLowerCase()
+      );
+      return found ? found.id : null;
+    },
+    [expenseCategories]
+  );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const budgetsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setBudgets(budgetsData);
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error("Error fetching budgets:", error);
-        setIsLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  // Thêm ngân sách mới
-  const addBudget = async (budgetData) => {
-    if (!currentUser) return;
-    try {
-      await addDoc(collection(db, "users", currentUser.uid, "budgets"), {
-        ...budgetData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+  const addBudget = useCallback(
+    async (budgetData) => {
+      if (!ledgerId) return;
+      const categoryId = resolveCategoryId(budgetData.category);
+      await budgetApi.createBudget({
+        ledgerId,
+        month,
+        categoryId: categoryId || null,
+        limitAmountVnd: Math.round(Number(budgetData.limit)),
+        warningThreshold: budgetData.warningThreshold || 80,
       });
-    } catch (error) {
-      console.error("Error adding budget:", error);
-      throw error;
-    }
-  };
+      await reload();
+    },
+    [ledgerId, month, resolveCategoryId, reload]
+  );
 
-  // Cập nhật ngân sách
-  const updateBudget = async (id, updates) => {
-    if (!currentUser) return;
-    try {
-      const budgetRef = doc(db, "users", currentUser.uid, "budgets", id);
-      await updateDoc(budgetRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("Error updating budget:", error);
-      throw error;
-    }
-  };
+  const updateBudget = useCallback(
+    async (id, updates) => {
+      const payload = {};
+      if (updates.limit !== undefined)
+        payload.limitAmountVnd = Math.round(Number(updates.limit));
+      if (updates.warningThreshold !== undefined)
+        payload.warningThreshold = updates.warningThreshold;
+      await budgetApi.updateBudget(id, payload);
+      await reload();
+    },
+    [reload]
+  );
 
-  // Xóa ngân sách
-  const deleteBudget = async (id) => {
-    if (!currentUser) return;
-    try {
-      const budgetRef = doc(db, "users", currentUser.uid, "budgets", id);
-      await deleteDoc(budgetRef);
-    } catch (error) {
-      console.error("Error deleting budget:", error);
-      throw error;
-    }
-  };
+  const deleteBudget = useCallback(
+    async (id) => {
+      await budgetApi.deleteBudget(id);
+      await reload();
+    },
+    [reload]
+  );
 
   return {
     budgets,

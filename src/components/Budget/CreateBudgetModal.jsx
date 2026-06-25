@@ -10,11 +10,12 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import { CATEGORY_ICONS } from "../AddTransactionModal/categoryStructure";
 import { useBudgetContext } from "../../contexts/BudgetContext";
+import { useCategoryContext } from "../../contexts/CategoryContext";
 
 const CreateBudgetModal = ({ isOpen, onClose, editingBudget }) => {
   const { addBudget, updateBudget, budgets } = useBudgetContext();
+  const { expenseCategories } = useCategoryContext();
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,14 +33,14 @@ const CreateBudgetModal = ({ isOpen, onClose, editingBudget }) => {
     setError("");
   }, [editingBudget, isOpen]);
 
-  // Lấy danh sách category chưa có budget (nếu đang tạo mới)
-  const availableCategories = Object.keys(CATEGORY_ICONS).filter(
-    (cat) =>
-      // Nếu đang edit thì cho phép chọn lại category hiện tại
-      // Nếu đang tạo mới thì chỉ hiện category chưa có budget
-      editingBudget?.category === cat ||
-      !budgets.some((b) => b.category === cat)
-  );
+  // Lấy danh sách danh mục chi (theo tên) chưa có budget (nếu đang tạo mới)
+  const availableCategories = expenseCategories
+    .map((c) => c.name)
+    .filter(
+      (cat) =>
+        editingBudget?.category === cat ||
+        !budgets.some((b) => b.category === cat)
+    );
 
   const handleSubmit = async () => {
     if (!category || !limit) {

@@ -1,15 +1,8 @@
 import { useState, useMemo } from "react";
 import { parse, format, isValid } from "date-fns";
-import {
-  writeBatch,
-  collection,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "../../services/firebase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTransactionsContext } from "../../contexts/TransactionsContext";
 import {
-  EXPECTED_COLUMNS,
   DATE_FORMATS,
   AMOUNT_CLEANUP_REGEX,
   DEFAULT_CATEGORY,
@@ -24,6 +17,7 @@ import {
  */
 export const useBulkImport = () => {
   const { currentUser } = useAuth();
+  const { bulkAddTransactions } = useTransactionsContext();
   const [rawData, setRawData] = useState("");
   const [parsedData, setParsedData] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -218,43 +212,23 @@ export const useBulkImport = () => {
     setSaveResult(null);
 
     try {
-      const transactionsRef = collection(
-        db,
-        "users",
-        currentUser.uid,
-        "transactions"
-      );
+      const items = validTransactions.map((item) => ({
+        date: item.date,
+        type: item.type,
+        category: item.category,
+        amount: Number(item.amount),
+        note: item.note || "",
+        paymentMethod: item.paymentMethod || "cash",
+        ...(item.paymentMethod === "transfer" && item.bankName
+          ? { bankName: item.bankName }
+          : {}),
+      }));
 
-      // Sử dụng Batch Write để lưu nhiều document cùng lúc
-      const batch = writeBatch(db);
-
-      validTransactions.forEach((item) => {
-        const docRef = doc(transactionsRef);
-        const transactionData = {
-          userId: currentUser.uid,
-          date: item.date,
-          type: item.type,
-          category: item.category,
-          amount: Number(item.amount),
-          note: item.note || "",
-          paymentMethod: item.paymentMethod || "cash",
-          createdAt: serverTimestamp(),
-        };
-
-        // Chỉ thêm bankName nếu paymentMethod là transfer
-        if (item.paymentMethod === "transfer" && item.bankName) {
-          transactionData.bankName = item.bankName;
-        }
-
-        batch.set(docRef, transactionData);
-      });
-
-      // Commit batch
-      await batch.commit();
+      const saved = await bulkAddTransactions(items);
 
       setSaveResult({
         success: true,
-        saved: validTransactions.length,
+        saved,
         total: parsedData.length,
       });
 
