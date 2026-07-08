@@ -144,6 +144,7 @@ const CreateDebtModal = ({ isOpen, onClose, onSubmit, editingDebt = null }) => {
             label="Số tiền"
             placeholder="Nhập số tiền"
             type="number"
+            min={0}
             value={formData.amount}
             onValueChange={(value) => handleChange("amount", value)}
             startContent={<DollarSign size={18} className="text-default-400" />}
@@ -157,6 +158,7 @@ const CreateDebtModal = ({ isOpen, onClose, onSubmit, editingDebt = null }) => {
           <Input
             label="Hạn trả (tùy chọn)"
             type="date"
+            min={new Date().toISOString().split("T")[0]}
             value={formData.dueDate}
             onValueChange={(value) => handleChange("dueDate", value)}
             startContent={<Calendar size={18} className="text-default-400" />}
