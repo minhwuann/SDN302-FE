@@ -15,6 +15,7 @@ import { useAddTransactionForm } from "./useAddTransactionForm";
 import CategorySelector from "./CategorySelector";
 import BankSelector from "./BankSelector";
 import ImageScanButton from "./ImageScanButton";
+import { useTransactionsContext } from "../../contexts/TransactionsContext";
 
 /**
  * Component Modal thêm/sửa giao dịch
@@ -27,6 +28,8 @@ const AddTransactionModal = ({
   onUpdateTransaction,
   editingTransaction = null,
 }) => {
+  const { currentLedger } = useTransactionsContext();
+
   // Sử dụng hook để lấy logic và state
   const {
     formData,
@@ -73,6 +76,7 @@ const AddTransactionModal = ({
               {/* Khu vực quét hóa đơn - chỉ hiện khi thêm mới */}
               {!isEditMode && (
                 <ImageScanButton
+                  ledgerId={currentLedger?.id}
                   onExtracted={(data) => {
                     // Auto-fill form với dữ liệu từ AI
                     setFormData((prev) => ({

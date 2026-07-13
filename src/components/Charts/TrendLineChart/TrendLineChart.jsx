@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@heroui/react";
 import {
   LineChart,
@@ -10,52 +10,74 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { parseISO, startOfMonth, isSameMonth, subMonths } from "date-fns";
-import { useTransactionsContext } from "../../../contexts/TransactionsContext";
+import {
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth,
+  subMonths,
+} from "date-fns";
+import * as analyticsApi from "../../../services/analyticsApi";
 
-const TrendLineChart = () => {
-  const { transactions } = useTransactionsContext();
+/**
+ * Biểu đồ xu hướng chi tiêu - Tháng này vs Tháng trước, theo tuần trong tháng.
+ * Nguồn dữ liệu: /analytics/daily-spending (chỉ expense, đã SUM sẵn theo ngày ở BE).
+ */
+const TrendLineChart = ({ ledgerId }) => {
+  const [days, setDays] = useState([]);
+
+  useEffect(() => {
+    if (!ledgerId) return undefined;
+    const today = new Date();
+    let active = true;
+    analyticsApi
+      .getDailySpending({
+        ledgerId,
+        dateFrom: analyticsApi.toApiDate(startOfMonth(subMonths(today, 1))),
+        dateTo: analyticsApi.toApiDate(endOfMonth(today)),
+      })
+      .then((data) => {
+        if (active) setDays(data);
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải xu hướng chi tiêu:", err);
+        if (active) setDays([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ledgerId]);
 
   const data = useMemo(() => {
     const today = new Date();
     const thisMonthStart = startOfMonth(today);
     const lastMonthStart = startOfMonth(subMonths(today, 1));
 
-    // Helper để nhóm giao dịch theo tuần trong tháng (Tuần 1, 2, 3, 4)
-    const groupByWeek = (txs) => {
+    // Helper để nhóm theo tuần trong tháng (Tuần 1, 2, 3, 4, 5)
+    const groupByWeek = (monthStart) => {
       const weeks = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
-      txs.forEach((t) => {
-        const date = parseISO(t.date);
-        // Chỉ lấy expense
-        if (t.type !== "expense") return;
+      days.forEach((d) => {
+        const date = parseISO(d.date);
+        if (!isSameMonth(date, monthStart)) return;
 
-        // Tính tuần tương đối trong tháng (1-5)
-        const dayOfMonth = date.getDate();
-        const weekIndex = Math.ceil(dayOfMonth / 7);
+        const weekIndex = Math.ceil(date.getDate() / 7);
         if (weeks[weekIndex] !== undefined) {
-          weeks[weekIndex] += t.amount;
+          weeks[weekIndex] += d.totalExpenseVnd;
         }
       });
       return weeks;
     };
 
-    const thisMonthTxs = transactions.filter((t) =>
-      isSameMonth(parseISO(t.date), thisMonthStart)
-    );
-    const lastMonthTxs = transactions.filter((t) =>
-      isSameMonth(parseISO(t.date), lastMonthStart)
-    );
-
-    const thisMonthData = groupByWeek(thisMonthTxs, thisMonthStart);
-    const lastMonthData = groupByWeek(lastMonthTxs, lastMonthStart);
+    const thisMonthData = groupByWeek(thisMonthStart);
+    const lastMonthData = groupByWeek(lastMonthStart);
 
     return [1, 2, 3, 4, 5].map((week) => ({
       name: `Tuần ${week}`,
       "Tháng này": thisMonthData[week],
       "Tháng trước": lastMonthData[week],
     }));
-  }, [transactions]);
+  }, [days]);
 
   return (
     <Card className="h-[400px] w-full shadow-sm border border-gray-100 dark:border-gray-800">

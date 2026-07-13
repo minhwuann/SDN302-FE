@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import * as analyticsApi from "../../../services/analyticsApi";
 import {
   TOP_CATEGORIES_COUNT,
   EXPENSE_COLORS,
@@ -9,22 +10,22 @@ import {
   OTHER_COLOR_DARK,
 } from "./constants";
 
+// BE giới hạn tối đa 20 danh mục/lần gọi - đủ dư so với TOP_CATEGORIES_COUNT (5)
+// để gom phần còn lại vào "Khác" giống hệt logic cũ tính từ transactions thô.
+const FETCH_LIMIT = 20;
+
 /**
- * Hook xử lý logic tính toán dữ liệu cho biểu đồ tròn
- * Bao gồm: lọc theo loại, nhóm theo danh mục, tính phần trăm, gom nhóm Top 5 + "Khác"
- * 
- * @param {Array} transactions - Mảng các giao dịch cần xử lý
- * @returns {Object} Object chứa dữ liệu đã xử lý và các state liên quan
- * @returns {string} returns.selectedType - Loại giao dịch đang chọn ('expense' | 'income')
- * @returns {Function} returns.setSelectedType - Hàm set state cho selectedType
- * @returns {Array} returns.chartData - Dữ liệu đã được xử lý để vẽ biểu đồ
- * @returns {Array} returns.colors - Bảng màu tương ứng với loại giao dịch và dark mode
- * @returns {string} returns.otherColor - Màu cho nhóm "Khác"
- * @returns {string} returns.cardTitle - Tiêu đề Card dựa trên loại giao dịch
+ * Hook lấy dữ liệu cơ cấu danh mục từ BE (/analytics/category-breakdown)
+ * và gom Top 5 + "Khác" giống hệt logic hiển thị trước đây.
+ *
+ * @param {string} ledgerId
+ * @param {string} [dateFrom] - "yyyy-MM-dd"
+ * @param {string} [dateTo] - "yyyy-MM-dd"
  */
-export const usePieChartData = (transactions) => {
+export const usePieChartData = (ledgerId, dateFrom, dateTo) => {
   const [selectedType, setSelectedType] = useState("expense");
   const [isDark, setIsDark] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   /**
    * Theo dõi dark mode để điều chỉnh màu sắc
@@ -46,88 +47,74 @@ export const usePieChartData = (transactions) => {
     return () => observer.disconnect();
   }, []);
 
-  /**
-   * Lọc transactions theo loại đã chọn
-   */
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => tx.type === selectedType);
-  }, [transactions, selectedType]);
+  /** Tải cơ cấu danh mục từ BE mỗi khi đổi sổ/khoảng ngày/loại (thu-chi). */
+  useEffect(() => {
+    if (!ledgerId) return undefined;
+    let active = true;
+    analyticsApi
+      .getCategoryBreakdown({
+        ledgerId,
+        dateFrom,
+        dateTo,
+        type: selectedType,
+        limit: FETCH_LIMIT,
+      })
+      .then((data) => {
+        if (active) setCategories(data);
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải cơ cấu danh mục:", err);
+        if (active) setCategories([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ledgerId, dateFrom, dateTo, selectedType]);
 
   /**
-   * Tính toán dữ liệu cho biểu đồ tròn theo danh mục
-   * Logic: Nhóm theo category -> Tính tổng và phần trăm -> Sắp xếp -> Gom Top 5 + "Khác"
+   * Gom Top 5 danh mục (đã sắp xếp giảm dần từ BE) + "Khác" cho phần còn lại.
    */
   const chartData = useMemo(() => {
-    const categoryMap = {};
+    if (categories.length === 0) return [];
 
-    // Nhóm transactions theo danh mục (chỉ từ filteredTransactions)
-    filteredTransactions.forEach((tx) => {
-      const category = tx.category || "Khác";
-      if (!categoryMap[category]) {
-        categoryMap[category] = {
-          name: category,
-          value: 0,
-          type: tx.type,
-        };
-      }
-      categoryMap[category].value += tx.amount || 0;
-    });
+    const data = categories.map((c) => ({
+      name: c.categoryName || "Khác",
+      value: c.totalAmountVnd,
+      percentage: c.percentage,
+    }));
 
-    // Chuyển thành mảng và tính tổng
-    let data = Object.values(categoryMap);
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-
-    if (total === 0) {
-      return [];
-    }
-
-    // Thêm phần trăm và sắp xếp theo giá trị giảm dần
-    data = data
-      .map((item) => ({
-        ...item,
-        percentage: (item.value / total) * 100,
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    // Logic gom nhóm: Chỉ giữ Top 5, phần còn lại gom vào "Khác"
     const topCategories = data.slice(0, TOP_CATEGORIES_COUNT);
     const remainingCategories = data.slice(TOP_CATEGORIES_COUNT);
 
-    // Tính tổng giá trị của các danh mục còn lại
     const otherValue = remainingCategories.reduce(
       (sum, item) => sum + item.value,
       0
     );
-
-    // Kiểm tra xem trong Top 5 đã có "Khác" chưa
-    const otherIndex = topCategories.findIndex(
-      (item) => item.name === "Khác"
+    const otherPercentage = remainingCategories.reduce(
+      (sum, item) => sum + item.percentage,
+      0
     );
 
-    // Tạo mảng kết quả
+    const otherIndex = topCategories.findIndex((item) => item.name === "Khác");
     const result = [...topCategories];
 
     if (otherValue > 0) {
       if (otherIndex !== -1) {
-        // Nếu đã có "Khác" trong Top 5, cộng dồn giá trị vào đó
         result[otherIndex].value += otherValue;
-        result[otherIndex].percentage =
-          (result[otherIndex].value / total) * 100;
-        result[otherIndex].isGrouped = true; // Đánh dấu đã được gom thêm
+        result[otherIndex].percentage += otherPercentage;
+        result[otherIndex].isGrouped = true;
       } else {
-        // Nếu chưa có "Khác", tạo mới
         result.push({
           name: "Khác",
           value: otherValue,
-          percentage: (otherValue / total) * 100,
-          type: "other",
-          isGrouped: true, // Flag để nhận biết đây là nhóm "Khác" được gom lại
+          percentage: otherPercentage,
+          isGrouped: true,
         });
       }
     }
 
     return result;
-  }, [filteredTransactions]);
+  }, [categories]);
 
   /**
    * Chọn bảng màu dựa trên loại giao dịch và dark mode
@@ -156,4 +143,3 @@ export const usePieChartData = (transactions) => {
     cardTitle,
   };
 };
-

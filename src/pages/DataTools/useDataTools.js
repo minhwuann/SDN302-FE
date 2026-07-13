@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parse, format, isValid } from "date-fns";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -9,16 +9,98 @@ import {
   createSpreadsheet,
   exportDataToSheet,
 } from "../../services/googleSheets";
+import * as importApi from "../../services/importApi";
+import * as exportApi from "../../services/exportApi";
 import {
   DATE_FORMATS,
-  AMOUNT_CLEANUP_REGEX,
   DEFAULT_CATEGORY,
   DEFAULT_TYPE,
   SAMPLE_EXCEL_HEADERS,
   SAMPLE_EXCEL_FILENAME,
   EXPORT_EXCEL_FILENAME,
 } from "./constants";
-import { exportToPDF } from "../../utils/exportUtils";
+const IMPORT_CONTENT_HEADER =
+  "date\tamount\tcategory\tsubcategory\tnote\ttype\tpaymentmethod";
+
+const IMPORT_ERROR_MESSAGES = {
+  INVALID_TYPE: "Loại giao dịch không hợp lệ (income/expense hoặc thu/chi)",
+  INVALID_AMOUNT: "Số tiền không hợp lệ",
+  INVALID_DATE: "Ngày không hợp lệ",
+  INVALID_PAYMENT_METHOD: "Phương thức thanh toán không hợp lệ",
+  CATEGORY_NOT_FOUND: "Không tìm thấy danh mục phù hợp",
+  CATEGORY_MUST_BE_PARENT: "Danh mục phải là danh mục cha",
+  CATEGORY_TYPE_MISMATCH: "Danh mục không khớp loại thu/chi",
+  SUBCATEGORY_NOT_FOUND: "Không tìm thấy danh mục con phù hợp",
+  SUBCATEGORY_PARENT_MISMATCH: "Danh mục con không thuộc danh mục đã chọn",
+  PAYMENT_ACCOUNT_NOT_FOUND: "Không tìm thấy tài khoản thanh toán",
+};
+
+/** Bỏ tab/xuống dòng trong 1 field để không phá cấu trúc TSV gửi lên BE. */
+const escapeField = (value) => String(value ?? "").replace(/[\t\r\n]/g, " ");
+
+/**
+ * BE chỉ khớp category theo TÊN DANH MỤC CHA (vd "Ăn uống"); riêng "Thu nhập"
+ * chỉ có 1 danh mục cha, các nhãn quen thuộc (Lương, Freelance...) thực chất là
+ * danh mục CON của nó. Nên khi type=income, đẩy giá trị người dùng chọn xuống
+ * cột subcategory, còn category luôn là "Thu nhập" (hoặc "Khác" nếu để trống).
+ */
+const categoryColumnsFor = (type, category) => {
+  const trimmed = (category || "").trim();
+
+  if (!trimmed) {
+    return { categoryName: DEFAULT_CATEGORY, subcategoryName: "" };
+  }
+  if (type === "income") {
+    return { categoryName: "Thu nhập", subcategoryName: trimmed };
+  }
+  return { categoryName: trimmed, subcategoryName: "" };
+};
+
+/** Ghép các dòng {date, amount, category, note, type, paymentMethod} thành nội dung gửi /imports/preview. */
+const buildImportContent = (rows) => {
+  const lines = rows.map((row) => {
+    const { categoryName, subcategoryName } = categoryColumnsFor(
+      row.type,
+      row.category
+    );
+
+    return [
+      row.date,
+      row.amount,
+      categoryName,
+      subcategoryName,
+      row.note,
+      row.type,
+      row.paymentMethod || "",
+    ]
+      .map(escapeField)
+      .join("\t");
+  });
+
+  return [IMPORT_CONTENT_HEADER, ...lines].join("\n");
+};
+
+/** Tách textarea paste thô (không header) thành các cột [Ngày, Số tiền, Danh mục, Ghi chú, Loại]. */
+const splitRawPasteLines = (data) => {
+  if (!data || !data.trim()) return [];
+
+  return data
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [date = "", amount = "", category = "", note = "", type = ""] =
+        line.split("\t").map((col) => col.trim());
+
+      return {
+        date,
+        amount,
+        category,
+        note,
+        type: type.toLowerCase() === "income" ? "income" : DEFAULT_TYPE,
+      };
+    });
+};
 
 /**
  * Hook xử lý logic cho DataTools
@@ -28,10 +110,13 @@ import { exportToPDF } from "../../utils/exportUtils";
  */
 export const useDataTools = () => {
   const { currentUser } = useAuth();
-  const { transactions, bulkAddTransactions } = useTransactionsContext();
+  const { transactions, currentLedger, bulkAddTransactions, refreshData } =
+    useTransactionsContext();
 
   const [rawData, setRawData] = useState("");
   const [parsedData, setParsedData] = useState([]);
+  const [importJobId, setImportJobId] = useState(null);
+  const [isRevalidating, setIsRevalidating] = useState(false);
   const [directInputData, setDirectInputData] = useState([]); // Dữ liệu nhập trực tiếp vào bảng
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -79,170 +164,149 @@ export const useDataTools = () => {
   };
 
   /**
-   * Parse số tiền từ chuỗi
-   * Loại bỏ các ký tự không phải số (đ, dấu phẩy, dấu chấm...)
-   *
-   * @param {string} amountString - Chuỗi số tiền cần parse
-   * @returns {number|null} Số tiền đã parse hoặc null nếu không parse được
+   * Gửi lại toàn bộ dòng hiện tại cho BE preview (debounce 500ms) để đồng bộ
+   * lại errors/isValid sau khi user sửa 1 ô - giữ nguyên id/thứ tự cục bộ,
+   * chỉ đồng bộ kết quả validate (BE trả rows theo đúng thứ tự đã gửi).
    */
-  const parseAmount = (amountString) => {
-    if (!amountString || !amountString.trim()) return null;
+  const revalidateTimerRef = useRef(null);
 
-    // Loại bỏ tất cả ký tự không phải số
-    const cleaned = amountString.toString().replace(AMOUNT_CLEANUP_REGEX, "");
-    if (!cleaned) return null;
+  useEffect(() => {
+    return () => {
+      if (revalidateTimerRef.current) clearTimeout(revalidateTimerRef.current);
+    };
+  }, []);
 
-    const amount = parseInt(cleaned, 10);
-    return isNaN(amount) || amount <= 0 ? null : amount;
-  };
+  const revalidateParsedData = (rows) => {
+    if (revalidateTimerRef.current) clearTimeout(revalidateTimerRef.current);
+    if (!currentLedger || rows.length === 0) return;
 
-  /**
-   * Phân tích dữ liệu raw thành mảng các transaction objects
-   * Tách dòng bằng \n, tách cột bằng \t
-   *
-   * @param {string} data - Dữ liệu raw từ Textarea
-   * @returns {Array} Mảng các transaction objects (có thể có lỗi)
-   */
-  const analyzeData = (data) => {
-    if (!data || !data.trim()) return [];
-
-    const lines = data.split("\n").filter((line) => line.trim());
-    const results = [];
-
-    lines.forEach((line, index) => {
-      const columns = line.split("\t").map((col) => col.trim());
-
-      // Ít nhất phải có 2 cột (Ngày và Số tiền)
-      if (columns.length < 2) {
-        results.push({
-          id: `temp-${index}`,
-          rowNumber: index + 1,
-          date: columns[0] || "",
-          amount: columns[1] || "",
-          category: columns[2] || "",
-          note: columns[3] || "",
-          type: columns[4]?.toLowerCase() || DEFAULT_TYPE,
-          paymentMethod: "cash",
-          errors: ["Thiếu cột dữ liệu"],
-          isValid: false,
+    setIsRevalidating(true);
+    revalidateTimerRef.current = setTimeout(async () => {
+      try {
+        const content = buildImportContent(rows);
+        const job = await importApi.previewImport({
+          ledgerId: currentLedger.id,
+          sourceType: "paste_text",
+          content,
         });
-        return;
+
+        setImportJobId(job.id);
+        const beRows = job.summary?.rows || [];
+        setParsedData((prev) =>
+          prev.map((item, index) => ({
+            ...item,
+            errors: (beRows[index]?.errors || []).map(
+              (e) => IMPORT_ERROR_MESSAGES[e.code] || e.message
+            ),
+            isValid: beRows[index]?.isValid ?? false,
+          }))
+        );
+      } catch (error) {
+        console.error("Lỗi khi xác thực lại dữ liệu:", error);
+      } finally {
+        setIsRevalidating(false);
       }
-
-      // Parse các giá trị
-      const parsedDate = parseDate(columns[0]);
-      const parsedAmount = parseAmount(columns[1]);
-      const category = columns[2] || DEFAULT_CATEGORY;
-      const note = columns[3] || "";
-      const type = columns[4]?.toLowerCase() || DEFAULT_TYPE;
-
-      // Validate type
-      const validType =
-        type === "income" || type === "expense" ? type : DEFAULT_TYPE;
-
-      // Kiểm tra lỗi
-      const errors = [];
-      if (!parsedDate) {
-        errors.push("Ngày không hợp lệ");
-      }
-      if (!parsedAmount) {
-        errors.push("Số tiền không hợp lệ");
-      }
-
-      results.push({
-        id: `temp-${index}`,
-        rowNumber: index + 1,
-        date: parsedDate || columns[0],
-        amount: parsedAmount || columns[1],
-        category: category,
-        note: note,
-        type: validType,
-        paymentMethod: "cash",
-        errors: errors,
-        isValid: errors.length === 0,
-      });
-    });
-
-    return results;
+    }, 500);
   };
 
   /**
-   * Xử lý khi người dùng bấm nút "Phân tích"
+   * Xử lý khi người dùng bấm nút "Phân tích" - gửi nội dung đã paste lên
+   * BE (/imports/preview) để parse + validate (category/tài khoản phải khớp
+   * dữ liệu thật của user), thay vì tự parse rồi tin tưởng ở client.
    */
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!currentLedger) {
+      alert("Vui lòng chọn sổ thu chi trước khi phân tích dữ liệu");
+      return;
+    }
+
+    const rows = splitRawPasteLines(rawData);
+    if (rows.length === 0) {
+      setParsedData([]);
+      return;
+    }
+
     setIsAnalyzing(true);
     setSaveResult(null);
+    setImportJobId(null);
 
     try {
-      const analyzed = analyzeData(rawData);
-      setParsedData(analyzed);
+      const rowsWithPaymentMethod = rows.map((r) => ({
+        ...r,
+        paymentMethod: "cash",
+      }));
+      const content = buildImportContent(rowsWithPaymentMethod);
+      const job = await importApi.previewImport({
+        ledgerId: currentLedger.id,
+        sourceType: "paste_text",
+        content,
+      });
+
+      setImportJobId(job.id);
+      const beRows = job.summary?.rows || [];
+      setParsedData(
+        rows.map((row, index) => ({
+          id: `paste-${index}-${Date.now()}`,
+          rowNumber: index + 1,
+          date: row.date,
+          amount: row.amount,
+          category: row.category,
+          note: row.note,
+          type: row.type,
+          paymentMethod: "cash",
+          errors: (beRows[index]?.errors || []).map(
+            (e) => IMPORT_ERROR_MESSAGES[e.code] || e.message
+          ),
+          isValid: beRows[index]?.isValid ?? false,
+        }))
+      );
     } catch (error) {
       console.error("Lỗi khi phân tích dữ liệu:", error);
       setParsedData([]);
+      alert(error.message || "Có lỗi xảy ra khi phân tích dữ liệu");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   /**
-   * Cập nhật một transaction trong preview (từ paste Excel)
-   * Validate TẤT CẢ các field bắt buộc sau mỗi update
+   * Cập nhật một dòng trong preview (từ paste Excel) - cập nhật cục bộ ngay
+   * để gõ mượt, rồi lên lịch xác thực lại với BE (debounce).
    *
    * @param {string} id - ID của transaction cần cập nhật
    * @param {Object} updates - Object chứa các field cần cập nhật
    */
   const updateParsedItem = (id, updates) => {
-    setParsedData((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const updated = { ...item, ...updates };
-          const errors = [];
-
-          // === VALIDATE DATE ===
-          const dateValid = parseDate(updated.date);
-          if (!dateValid) {
-            errors.push("Ngày không hợp lệ");
-          }
-
-          // === VALIDATE AMOUNT ===
-          let numericAmount = 0;
-          if (typeof updated.amount === "number") {
-            numericAmount = updated.amount;
-          } else if (updated.amount) {
-            // Parse từ string (có thể có dấu chấm phân cách)
-            const cleaned = String(updated.amount).replace(/[^\d]/g, "");
-            numericAmount = parseInt(cleaned, 10) || 0;
-          }
-
-          if (numericAmount <= 0) {
-            errors.push("Số tiền không hợp lệ");
-          } else {
-            updated.amount = numericAmount; // Lưu dạng số
-          }
-
-          // === XỬ LÝ CATEGORY ===
-          if (!updated.category || updated.category.trim() === "") {
-            updated.category = "Khác";
-          }
-
-          // === SET VALIDATION RESULT ===
-          updated.errors = errors;
-          updated.isValid = errors.length === 0;
-
-          return updated;
-        }
-        return item;
-      })
-    );
+    setParsedData((prev) => {
+      const next = prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...updates,
+              amount:
+                updates.amount !== undefined
+                  ? Number(String(updates.amount).replace(/[^\d]/g, "")) || 0
+                  : item.amount,
+            }
+          : item
+      );
+      revalidateParsedData(next);
+      return next;
+    });
   };
 
   /**
-   * Xóa một dòng khỏi preview
+   * Xóa một dòng khỏi preview rồi xác thực lại phần còn lại với BE
+   * (rowNumber của các dòng sau sẽ dịch lên).
    *
    * @param {string} id - ID của transaction cần xóa
    */
   const removeParsedItem = (id) => {
-    setParsedData((prev) => prev.filter((item) => item.id !== id));
+    setParsedData((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      revalidateParsedData(next);
+      return next;
+    });
   };
 
   /**
@@ -322,21 +386,63 @@ export const useDataTools = () => {
   };
 
   /**
-   * Lưu tất cả các transaction hợp lệ vào Firestore
-   * Sử dụng Batch Write để tối ưu hiệu suất
-   * Merge cả dữ liệu từ paste và nhập trực tiếp
+   * Xác nhận (commit) import job hiện tại của tab Paste Excel - BE tạo giao
+   * dịch cho các dòng hợp lệ, có audit log riêng cho từng lần import.
    */
-  const handleSaveAll = async () => {
+  const handlePasteImportCommit = async () => {
+    if (!currentUser) {
+      alert("Vui lòng đăng nhập để lưu dữ liệu");
+      return;
+    }
+    if (isRevalidating) {
+      alert("Đang xác thực lại dữ liệu, vui lòng đợi rồi thử lại");
+      return;
+    }
+    if (!importJobId) {
+      alert("Chưa có dữ liệu đã phân tích để lưu");
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveResult(null);
+
+    try {
+      const result = await importApi.commitImport(importJobId);
+
+      setSaveResult({
+        success: true,
+        saved: result.transactions.length,
+        total: parsedData.length,
+      });
+
+      setRawData("");
+      setParsedData([]);
+      setImportJobId(null);
+      await refreshData();
+    } catch (error) {
+      console.error("Lỗi khi lưu dữ liệu import:", error);
+      setSaveResult({
+        success: false,
+        error: error.message || "Có lỗi xảy ra khi lưu dữ liệu",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Lưu các dòng hợp lệ ở bảng nhập trực tiếp (bulk create thẳng qua
+   * /transactions/bulk - không cần audit job như import file).
+   */
+  const handleDirectInputSaveAll = async () => {
     if (!currentUser) {
       alert("Vui lòng đăng nhập để lưu dữ liệu");
       return;
     }
 
-    // Merge và lọc chỉ lấy các transaction hợp lệ từ cả 2 nguồn
-    const allData = [...parsedData, ...directInputData];
-    const validTransactions = allData.filter((item) => item.isValid);
+    const validItems = directInputData.filter((item) => item.isValid);
 
-    if (validTransactions.length === 0) {
+    if (validItems.length === 0) {
       alert("Không có giao dịch hợp lệ để lưu");
       return;
     }
@@ -345,7 +451,7 @@ export const useDataTools = () => {
     setSaveResult(null);
 
     try {
-      const items = validTransactions.map((item) => ({
+      const items = validItems.map((item) => ({
         date: item.date,
         type: item.type,
         category: item.category,
@@ -362,15 +468,12 @@ export const useDataTools = () => {
       setSaveResult({
         success: true,
         saved,
-        total: allData.length,
+        total: directInputData.length,
       });
 
-      // Reset sau khi lưu thành công
-      setRawData("");
-      setParsedData([]);
       setDirectInputData([]);
     } catch (error) {
-      console.error("[DEBUG handleSaveAll] ERROR:", error);
+      console.error("Lỗi khi lưu dữ liệu nhập trực tiếp:", error);
       setSaveResult({
         success: false,
         error: error.message || "Có lỗi xảy ra khi lưu dữ liệu",
@@ -414,10 +517,11 @@ export const useDataTools = () => {
   };
 
   /**
-   * Xuất dữ liệu ra file Excel
+   * Xuất dữ liệu ra file Excel - BE tự truy vấn + build file (tới 10.000
+   * dòng, không giới hạn bởi số giao dịch đã tải sẵn ở client).
    */
   const handleExportToExcel = async () => {
-    if (transactions.length === 0) {
+    if (!currentLedger) {
       alert("Không có dữ liệu để xuất");
       return;
     }
@@ -426,47 +530,14 @@ export const useDataTools = () => {
     setExportResult(null);
 
     try {
-      // Chuẩn bị dữ liệu
-      const exportData = transactions.map((tx) => ({
-        Ngày: tx.date,
-        Số_tiền: tx.amount,
-        Danh_mục: tx.category,
-        Ghi_chú: tx.note || "",
-        Loại: tx.type === "income" ? "Thu" : "Chi",
-        Phương_thức:
-          tx.paymentMethod === "transfer" ? "Chuyển khoản" : "Tiền mặt",
-        Ngân_hàng: tx.bankName || "",
-      }));
-
-      // Tạo workbook
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
-
-      // Điều chỉnh độ rộng cột
-      const colWidths = [
-        { wch: 12 }, // Ngày
-        { wch: 15 }, // Số tiền
-        { wch: 20 }, // Danh mục
-        { wch: 30 }, // Ghi chú
-        { wch: 10 }, // Loại
-        { wch: 15 }, // Phương thức
-        { wch: 15 }, // Ngân hàng
-      ];
-      ws["!cols"] = colWidths;
-
-      // Thêm worksheet vào workbook
-      XLSX.utils.book_append_sheet(wb, ws, "Lịch sử giao dịch");
-
-      // Xuất file
-      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([excelBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      const blob = await exportApi.exportTransactionsXlsx({
+        ledgerId: currentLedger.id,
       });
       saveAs(blob, EXPORT_EXCEL_FILENAME);
 
       setExportResult({
         success: true,
-        message: `Đã xuất ${transactions.length} giao dịch ra file Excel`,
+        message: "Đã xuất file Excel thành công",
       });
     } catch (error) {
       console.error("Lỗi khi xuất Excel:", error);
@@ -480,19 +551,26 @@ export const useDataTools = () => {
   };
 
   /**
-   * Xuất dữ liệu ra PDF
+   * Xuất dữ liệu ra PDF - BE tự truy vấn + build file (tới 10.000 dòng).
    */
   const handleExportPDF = async () => {
-    if (transactions.length === 0) {
+    if (!currentLedger) {
       alert("Không có dữ liệu để xuất");
       return;
     }
+
     setIsExporting(true);
+    setExportResult(null);
+
     try {
-      await exportToPDF(transactions);
+      const blob = await exportApi.exportTransactionsPdf({
+        ledgerId: currentLedger.id,
+      });
+      saveAs(blob, "transactions.pdf");
+
       setExportResult({
         success: true,
-        message: `Đã xuất ${transactions.length} giao dịch ra PDF`,
+        message: "Đã xuất file PDF thành công",
       });
     } catch (error) {
       console.error("Lỗi khi xuất PDF:", error);
@@ -655,6 +733,7 @@ export const useDataTools = () => {
     rawData,
     setRawData,
     parsedData,
+    isRevalidating,
     directInputData,
     isAnalyzing,
     isSaving,
@@ -672,7 +751,8 @@ export const useDataTools = () => {
     addNewDirectInputRow,
     updateDirectInputItem,
     removeDirectInputItem,
-    handleSaveAll,
+    handlePasteImportCommit,
+    handleDirectInputSaveAll,
     handleDownloadSample,
     handleExportToExcel,
     handleCopyToClipboard,

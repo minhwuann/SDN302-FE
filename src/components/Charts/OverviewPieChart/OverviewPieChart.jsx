@@ -74,7 +74,7 @@ const renderCustomLabel = ({
  * Component biểu đồ tròn hiển thị cơ cấu chi tiêu/thu nhập theo danh mục
  * Chỉ chứa UI, logic được xử lý bởi usePieChartData hook
  */
-const OverviewPieChart = ({ transactions }) => {
+const OverviewPieChart = ({ ledgerId, dateFrom, dateTo }) => {
   const {
     selectedType,
     setSelectedType,
@@ -82,7 +82,7 @@ const OverviewPieChart = ({ transactions }) => {
     colors,
     otherColor,
     cardTitle,
-  } = usePieChartData(transactions);
+  } = usePieChartData(ledgerId, dateFrom, dateTo);
 
   if (chartData.length === 0) {
     return (

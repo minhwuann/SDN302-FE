@@ -10,10 +10,11 @@
  */
 
 import { Tabs, Tab } from "@heroui/react";
-import { Database, Upload, Table2, Download, Settings } from "lucide-react";
+import { Database, Upload, Table2, Download, Settings, Landmark } from "lucide-react";
 import { useDataTools } from "./useDataTools";
 import { PasteExcelTab, DirectInputTab, ExportTab } from "./tabs";
 import CategoryManager from "../../components/CategoryManager/CategoryManager";
+import PaymentAccountManager from "../../components/PaymentAccountManager/PaymentAccountManager";
 import ThemeButton from "../../components/ThemeButton";
 import RefreshButton from "../../components/RefreshButton";
 
@@ -28,16 +29,19 @@ function DataTools() {
     setRawData,
     parsedData,
     isAnalyzing,
+    isRevalidating,
     handleAnalyze,
     updateParsedItem,
     removeParsedItem,
     handleDownloadSample,
+    handlePasteImportCommit,
 
     // Direct Input Tab
     directInputData,
     addNewDirectInputRow,
     updateDirectInputItem,
     removeDirectInputItem,
+    handleDirectInputSaveAll,
 
     // Export Tab
     transactionsCount,
@@ -53,7 +57,6 @@ function DataTools() {
     // Shared
     isSaving,
     saveResult,
-    handleSaveAll,
   } = useDataTools();
 
   return (
@@ -122,10 +125,10 @@ function DataTools() {
             onAnalyze={handleAnalyze}
             onUpdateRow={updateParsedItem}
             onRemoveRow={removeParsedItem}
-            onSaveAll={handleSaveAll}
+            onSaveAll={handlePasteImportCommit}
             onDownloadSample={handleDownloadSample}
             isAnalyzing={isAnalyzing}
-            isSaving={isSaving}
+            isSaving={isSaving || isRevalidating}
             saveResult={saveResult}
           />
         </Tab>
@@ -145,7 +148,7 @@ function DataTools() {
             onAddRow={addNewDirectInputRow}
             onUpdateRow={updateDirectInputItem}
             onRemoveRow={removeDirectInputItem}
-            onSaveAll={handleSaveAll}
+            onSaveAll={handleDirectInputSaveAll}
             isSaving={isSaving}
             saveResult={saveResult}
           />
@@ -186,6 +189,21 @@ function DataTools() {
         >
           <div className="mt-4">
             <CategoryManager />
+          </div>
+        </Tab>
+
+        {/* Tab 5: Tài Khoản Thanh Toán */}
+        <Tab
+          key="payment-accounts"
+          title={
+            <div className="flex items-center gap-2">
+              <Landmark className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Tài Khoản</span>
+            </div>
+          }
+        >
+          <div className="mt-4">
+            <PaymentAccountManager />
           </div>
         </Tab>
       </Tabs>

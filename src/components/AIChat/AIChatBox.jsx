@@ -14,13 +14,11 @@ import {
   Divider,
 } from "@heroui/react";
 import {
-  Bot,
   Send,
   X,
   Trash2,
   CheckCircle2,
   XCircle,
-  Key,
   HelpCircle,
   Sparkles,
   MessageSquare,
@@ -33,8 +31,6 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { useAIChat } from "./useAIChat";
-import ApiKeyModal from "./ApiKeyModal";
-import { useGeminiKey } from "../../hooks/useGeminiKey";
 import { useDisclosure } from "@heroui/react";
 import { formatCurrency } from "../../utils/formatCurrency";
 
@@ -46,9 +42,8 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
   const {
     messages,
     isLoading,
-    previewTransaction,
     previewTransactions,
-    hasKey,
+    paymentAccounts,
     messagesEndRef,
     handleSendMessage,
     handleConfirmAdd,
@@ -56,13 +51,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
     handleClearChat,
   } = useAIChat();
 
-  const { apiKey, setApiKey } = useGeminiKey();
   // const { isOpen, onOpen, onOpenChange } = useDisclosure(); // Moved to Layout
-  const {
-    isOpen: isApiKeyModalOpen,
-    onOpen: onOpenApiKeyModal,
-    onOpenChange: onApiKeyModalChange,
-  } = useDisclosure();
   const {
     isOpen: isHelpOpen,
     onOpen: onOpenHelp,
@@ -151,19 +140,6 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
   };
 
   /**
-   * Lắng nghe event để mở ApiKeyModal
-   */
-  useEffect(() => {
-    const handleOpenApiKeyModal = () => {
-      onOpenApiKeyModal();
-    };
-    window.addEventListener("openApiKeyModal", handleOpenApiKeyModal);
-    return () => {
-      window.removeEventListener("openApiKeyModal", handleOpenApiKeyModal);
-    };
-  }, [onOpenApiKeyModal]);
-
-  /**
    * Xử lý khi người dùng gửi tin nhắn
    */
   const handleSubmit = (e) => {
@@ -210,19 +186,6 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {hasKey && (
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="light"
-                      onPress={onOpenApiKeyModal}
-                      aria-label="Quản lý API Key"
-                      title="Quản lý API Key"
-                      className="text-white/80 hover:text-white hover:bg-white/20"
-                    >
-                      <Key className="w-4 h-4" />
-                    </Button>
-                  )}
                   {messages.length > 0 && (
                     <Button
                       isIconOnly
@@ -250,19 +213,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
               <ModalBody className="p-0">
                 {/* Chat Messages */}
                 <div className="flex flex-col h-[60vh] sm:h-[55vh] bg-gray-50 dark:bg-gray-900">
-                  {!hasKey ? (
-                    <div className="flex-1 flex items-center justify-center p-6">
-                      <div className="text-center">
-                        <Bot className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">
-                          Vui lòng cấu hình API Key để sử dụng Trợ lý AI
-                        </p>
-                        <Button color="primary" onPress={onOpenApiKeyModal}>
-                          Cấu hình API Key
-                        </Button>
-                      </div>
-                    </div>
-                  ) : messages.length === 0 ? (
+                  {messages.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-primary-50/50 to-transparent dark:from-primary-950/30">
                       {/* AI Avatar với animation */}
                       <div className="relative mb-6">
@@ -362,12 +313,10 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   )}
 
                   {/* Preview Transaction Card(s) */}
-                  {(previewTransaction ||
-                    (previewTransactions &&
-                      previewTransactions.length > 0)) && (
+                  {previewTransactions.length > 0 && (
                     <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
                       <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                        {previewTransactions.length > 0
+                        {previewTransactions.length > 1
                           ? `Xem trước ${previewTransactions.length} giao dịch`
                           : "Xem trước giao dịch"}
                       </h4>
@@ -379,9 +328,12 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                             : ""
                         }`}
                       >
-                        {/* Hiển thị nhiều transactions */}
-                        {previewTransactions.length > 0 ? (
-                          previewTransactions.map((transaction, index) => (
+                        {previewTransactions.map((transaction, index) => {
+                          const paymentAccountName = paymentAccounts?.find(
+                            (a) => a.id === transaction.paymentAccountId
+                          )?.name;
+
+                          return (
                             <Card
                               key={index}
                               className="border border-primary-200 dark:border-primary-800"
@@ -390,7 +342,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                 <div className="space-y-1.5 text-xs sm:text-sm">
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600 dark:text-gray-400 font-medium">
-                                      Giao dịch {index + 1}:
+                                      {previewTransactions.length > 1
+                                        ? `Giao dịch ${index + 1}:`
+                                        : "Loại:"}
                                     </span>
                                     <Chip
                                       size="sm"
@@ -411,7 +365,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                       Số tiền:
                                     </span>
                                     <span className="font-semibold text-gray-900 dark:text-white">
-                                      {formatCurrency(transaction.amount)}
+                                      {formatCurrency(transaction.amountVnd)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -419,7 +373,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                       Danh mục:
                                     </span>
                                     <span className="text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
-                                      {transaction.category}
+                                      {transaction.categoryName || "Khác"}
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -427,7 +381,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                       Ngày:
                                     </span>
                                     <span className="text-gray-900 dark:text-white">
-                                      {transaction.date}
+                                      {transaction.transactionDate}
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -440,17 +394,16 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                         : "Tiền mặt"}
                                     </span>
                                   </div>
-                                  {transaction.paymentMethod === "transfer" &&
-                                    transaction.bankName && (
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400">
-                                          Ngân hàng/Ví:
-                                        </span>
-                                        <span className="text-gray-900 dark:text-white font-medium truncate max-w-[120px] sm:max-w-none">
-                                          {transaction.bankName}
-                                        </span>
-                                      </div>
-                                    )}
+                                  {paymentAccountName && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600 dark:text-gray-400">
+                                        Ngân hàng/Ví:
+                                      </span>
+                                      <span className="text-gray-900 dark:text-white font-medium truncate max-w-[120px] sm:max-w-none">
+                                        {paymentAccountName}
+                                      </span>
+                                    </div>
+                                  )}
                                   {transaction.note && (
                                     <div className="flex justify-between">
                                       <span className="text-gray-600 dark:text-gray-400">
@@ -464,91 +417,8 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                 </div>
                               </CardBody>
                             </Card>
-                          ))
-                        ) : previewTransaction ? (
-                          // Hiển thị 1 transaction như cũ
-                          <Card className="border border-primary-200 dark:border-primary-800">
-                            <CardBody className="p-3 sm:p-4">
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600 dark:text-gray-400">
-                                    Loại:
-                                  </span>
-                                  <Chip
-                                    size="sm"
-                                    color={
-                                      previewTransaction.type === "income"
-                                        ? "success"
-                                        : "danger"
-                                    }
-                                    variant="flat"
-                                  >
-                                    {previewTransaction.type === "income"
-                                      ? "Thu"
-                                      : "Chi"}
-                                  </Chip>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600 dark:text-gray-400">
-                                    Số tiền:
-                                  </span>
-                                  <span className="font-semibold text-gray-900 dark:text-white">
-                                    {formatCurrency(previewTransaction.amount)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600 dark:text-gray-400">
-                                    Danh mục:
-                                  </span>
-                                  <span className="text-gray-900 dark:text-white">
-                                    {previewTransaction.category}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600 dark:text-gray-400">
-                                    Ngày:
-                                  </span>
-                                  <span className="text-gray-900 dark:text-white">
-                                    {previewTransaction.date}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600 dark:text-gray-400">
-                                    Phương thức:
-                                  </span>
-                                  <span className="text-gray-900 dark:text-white">
-                                    {previewTransaction.paymentMethod ===
-                                    "transfer"
-                                      ? "Chuyển khoản"
-                                      : "Tiền mặt"}
-                                  </span>
-                                </div>
-                                {previewTransaction.paymentMethod ===
-                                  "transfer" &&
-                                  previewTransaction.bankName && (
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-600 dark:text-gray-400">
-                                        Ngân hàng/Ví:
-                                      </span>
-                                      <span className="text-gray-900 dark:text-white font-medium">
-                                        {previewTransaction.bankName}
-                                      </span>
-                                    </div>
-                                  )}
-                                {previewTransaction.note && (
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-400">
-                                      Ghi chú:
-                                    </span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {previewTransaction.note}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </CardBody>
-                          </Card>
-                        ) : null}
+                          );
+                        })}
                       </div>
 
                       {/* Action Buttons */}
@@ -579,8 +449,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   )}
 
                   {/* Input Area */}
-                  {hasKey && (
-                    <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
+                  <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
                       {attachedImage && (
                         <div className="relative mb-2 inline-block">
                           <img
@@ -665,24 +534,12 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                         </Button>
                       </form>
                     </div>
-                  )}
                 </div>
               </ModalBody>
             </>
           )}
         </ModalContent>
       </Modal>
-
-      {/* ApiKeyModal */}
-      {isApiKeyModalOpen && (
-        <ApiKeyModal
-          isOpen={isApiKeyModalOpen}
-          onOpenChange={onApiKeyModalChange}
-          onSaveKey={setApiKey}
-          currentApiKey={apiKey}
-          onDeleteKey={() => setApiKey("")}
-        />
-      )}
 
       {/* Help Guide Modal */}
       <Modal

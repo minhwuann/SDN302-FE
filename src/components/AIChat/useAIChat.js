@@ -1,86 +1,99 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { processUserMessage } from "../../services/gemini";
-import { useGeminiKey } from "../../hooks/useGeminiKey";
+import * as aiApi from "../../services/aiApi";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTransactionsContext } from "../../contexts/TransactionsContext";
-import * as functionHandlers from "../../services/geminiFunctionHandlers";
-import { useBudgetContext } from "../../contexts/BudgetContext";
-import { useGoals } from "../../hooks/useGoals";
-
-const STORAGE_KEY = "AIChatMessages";
 
 // Constants cho rate limiting
 const MIN_REQUEST_INTERVAL = 2000; // 2 giây giữa các request
 const MAX_REQUESTS_PER_MINUTE = 10; // Tối đa 10 requests/phút
 
+/** Tin nhắn có số tiền cụ thể -> thử /ai/transaction-preview trước khi hỏi /ai/chat. */
+const MONEY_PATTERN =
+  /\d+(?:[.,]\d+)?\s*(?:tri[eệ]u|trieu|tr|ngh[iì]n|nghin|ng[aà]n|ngan|k)?/iu;
+
+function looksLikeTransaction(text) {
+  return MONEY_PATTERN.test(text || "");
+}
+
+function getTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Hook xử lý logic cho AIChatBox
- * Quản lý chat history, xử lý tin nhắn, và tương tác với AI
- * Có rate limiting để tránh spam API
+ * Hook xử lý logic cho AIChatBox - gọi thẳng /api/v1/ai/* của BE
+ * (BE tự giữ Gemini key, tự suy luận + validate, tự lưu lịch sử hội thoại).
+ * Có rate limiting phía client để tránh spam.
  *
  * @returns {Object} Object chứa state và handlers
  */
 export const useAIChat = () => {
-  const { apiKey, hasKey } = useGeminiKey();
   const { currentUser } = useAuth();
-  const { addTransaction, deleteTransaction, transactions, currentLedger } =
+  const { currentLedger, paymentAccounts, refreshData } =
     useTransactionsContext();
 
-  const { budgets } = useBudgetContext();
-  const { goals } = useGoals();
-
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  // Lưu tin nhắn vào localStorage mỗi khi thay đổi
-  useEffect(() => {
-    // Lọc bỏ dataUrl khổng lồ của hình ảnh để tránh lỗi QuotaExceededError
-    const messagesToSave = messages.map((msg) => {
-      if (msg.image) {
-        const { image, ...rest } = msg;
-        return rest;
-      }
-      return msg;
-    });
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messagesToSave));
-    } catch (e) {
-      console.warn("Lỗi khi lưu chat history vào localStorage:", e);
-    }
-  }, [messages]);
+  const [messages, setMessages] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [previewTransaction, setPreviewTransaction] = useState(null);
-  const [previewTransactions, setPreviewTransactions] = useState([]); // Hỗ trợ nhiều transactions
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [previewTransactions, setPreviewTransactions] = useState([]);
   const messagesEndRef = useRef(null);
 
   // Rate limiting refs
   const lastRequestTimeRef = useRef(0);
   const requestCountRef = useRef([]);
 
-  /**
-   * Scroll xuống cuối chat khi có tin nhắn mới
-   */
+  /** Tải hội thoại AI gần nhất từ BE (thay cho cache localStorage trước đây). */
+  useEffect(() => {
+    if (!currentUser) {
+      setIsHistoryLoading(false);
+      return undefined;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const conversations = await aiApi.listConversations();
+        const latest = conversations[0];
+        if (!latest || !active) return;
+
+        const history = await aiApi.listConversationMessages(latest.id);
+        if (!active) return;
+
+        setConversationId(latest.id);
+        setMessages(
+          history
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content || "",
+              timestamp: m.createdAt,
+            }))
+        );
+      } catch (err) {
+        console.error("Lỗi khi tải lịch sử chat:", err);
+      } finally {
+        if (active) setIsHistoryLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
+  /** Scroll xuống cuối chat khi có tin nhắn mới */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /**
-   * Thêm tin nhắn vào chat history
-   *
-   * @param {string} role - 'user' hoặc 'assistant'
-   * @param {string} content - Nội dung tin nhắn
-   */
   const addMessage = (role, content, image = null) => {
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now().toString(),
+        id: `local-${Date.now()}`,
         role,
         content,
         image,
@@ -89,15 +102,9 @@ export const useAIChat = () => {
     ]);
   };
 
-  /**
-   * Kiểm tra rate limit
-   * @returns {Object} { allowed: boolean, waitTime: number, message: string }
-   */
-
   const checkRateLimit = useCallback(() => {
     const now = Date.now();
 
-    // Kiểm tra khoảng cách giữa 2 request
     const timeSinceLastRequest = now - lastRequestTimeRef.current;
     if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
       const waitTime = Math.ceil(
@@ -110,7 +117,6 @@ export const useAIChat = () => {
       };
     }
 
-    // Kiểm tra số request trong 1 phút
     const oneMinuteAgo = now - 60000;
     requestCountRef.current = requestCountRef.current.filter(
       (time) => time > oneMinuteAgo
@@ -129,276 +135,176 @@ export const useAIChat = () => {
     return { allowed: true, waitTime: 0, message: "" };
   }, []);
 
+  /** Đưa 1 preview giao dịch (từ transaction-preview hoặc receipt-scan) vào state chờ xác nhận. */
+  const showTransactionPreview = (previews, fallbackMessage) => {
+    setPreviewTransactions(previews);
+    const first = previews[0];
+    const summary =
+      previews.length > 1
+        ? `Đã chuẩn bị ${previews.length} giao dịch.\n\nVui lòng xác nhận bên dưới để lưu tất cả vào hệ thống.`
+        : `Đã chuẩn bị giao dịch ${
+            first.type === "income" ? "thu nhập" : "chi tiêu"
+          } ${first.amountVnd?.toLocaleString(
+            "vi-VN"
+          )} VND.\n\nVui lòng xác nhận bên dưới để lưu vào hệ thống.`;
+
+    addMessage("assistant", fallbackMessage || summary);
+  };
+
   /**
-   * Xử lý khi người dùng gửi tin nhắn
-   * Sử dụng Function Calling để AI có thể gọi trực tiếp các hàm trong hệ thống
+   * Xử lý khi người dùng gửi tin nhắn.
+   * - Có ảnh đính kèm -> /ai/receipt-scan (quét hoá đơn/chuyển khoản).
+   * - Có số tiền cụ thể -> /ai/transaction-preview (chuẩn bị giao dịch để xác nhận).
+   * - Còn lại -> /ai/chat (hỏi đáp, BE tự gọi tool nội bộ khi cần).
    *
    * @param {string} userMessage - Tin nhắn từ người dùng
+   * @param {{file: File, dataUrl: string}|null} attachedImage - Ảnh đính kèm (nếu có)
    */
   const handleSendMessage = async (userMessage, attachedImage = null) => {
-    if ((!userMessage?.trim() && !attachedImage) || !hasKey || !currentUser) return;
-    if (isLoading) return; // Chặn gửi khi đang loading
+    if ((!userMessage?.trim() && !attachedImage) || !currentUser || !currentLedger)
+      return;
+    if (isLoading) return;
 
-    // Kiểm tra rate limit
     const rateLimitCheck = checkRateLimit();
     if (!rateLimitCheck.allowed) {
       addMessage("assistant", `⏳ ${rateLimitCheck.message}`);
       return;
     }
 
-    // Cập nhật rate limit tracking
     const now = Date.now();
     lastRequestTimeRef.current = now;
     requestCountRef.current.push(now);
 
-    // Thêm tin nhắn người dùng vào chat
-    addMessage("user", userMessage || "Đã đính kèm một hình ảnh", attachedImage?.dataUrl);
+    addMessage(
+      "user",
+      userMessage || "Đã đính kèm một hình ảnh",
+      attachedImage?.dataUrl
+    );
     setIsLoading(true);
 
     try {
-      // Chuẩn bị context cho function handlers
-      const context = {
-        userId: currentUser.uid,
-        ledgerId: currentLedger?.id || "main",
-        transactions: transactions || [],
-        budgets: budgets || [],
-        goals: goals || [],
-        addTransaction: addTransaction,
-        deleteTransaction: deleteTransaction,
-      };
+      if (attachedImage) {
+        const mimeType =
+          attachedImage.dataUrl.split(";")[0].split(":")[1] || "image/jpeg";
+        const imageBase64 = attachedImage.dataUrl.split(",")[1];
 
-      // Giới hạn chat history để giảm token (chỉ giữ 4 messages gần nhất)
-      const MAX_HISTORY = 4;
-      const limitedHistory =
-        messages.length > MAX_HISTORY ? messages.slice(-MAX_HISTORY) : messages;
+        const result = await aiApi.scanReceipt({
+          ledgerId: currentLedger.id,
+          imageBase64,
+          mimeType,
+          timeZone: getTimeZone(),
+        });
 
-      // Tạo sẵn tin nhắn rỗng của AI để stream chữ
-      const assistantMessageId = Date.now().toString() + "-ai";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: assistantMessageId,
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-        },
-      ]);
-
-      const onStream = (textChunk) => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: msg.content + textChunk }
-              : msg
-          )
-        );
-      };
-
-      // Gọi processUserMessage với Function Calling và Streaming
-      const aiResponse = await processUserMessage(
-        userMessage,
-        apiKey,
-        limitedHistory,
-        functionHandlers,
-        context,
-        onStream,
-        attachedImage
-      );
-
-      // Xử lý function calls nếu có
-      if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-        // Lấy tất cả các addTransaction calls
-        const addTransactionCalls = aiResponse.functionCalls.filter(
-          (fc) => fc.name === "addTransaction" && fc.result && fc.result.success
-        );
-
-        if (addTransactionCalls.length > 0) {
-          // Xử lý nhiều transactions cùng lúc
-          const transactions = addTransactionCalls
-            .map((fc) => fc.result.transaction)
-            .filter((tx) => tx); // Lọc bỏ null/undefined
-
-          if (transactions.length === 1) {
-            // Chỉ 1 transaction - dùng previewTransaction như cũ
-            setPreviewTransaction(transactions[0]);
-            setPreviewTransactions([]);
-            const previewMessage =
-              aiResponse.text ||
-              `Đã chuẩn bị giao dịch ${
-                transactions[0].type === "income" ? "thu nhập" : "chi tiêu"
-              } ${transactions[0].amount?.toLocaleString(
-                "vi-VN"
-              )} VND.\n\nVui lòng xác nhận bên dưới để lưu vào hệ thống.`;
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: previewMessage }
-                  : msg
-              )
-            );
-          } else if (transactions.length > 1) {
-            // Nhiều transactions - dùng previewTransactions
-            setPreviewTransaction(null);
-            setPreviewTransactions(transactions);
-            const previewMessage =
-              aiResponse.text ||
-              `Đã chuẩn bị ${transactions.length} giao dịch.\n\nVui lòng xác nhận bên dưới để lưu tất cả vào hệ thống.`;
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: previewMessage }
-                  : msg
-              )
-            );
-          }
+        if (result.missingFields.length > 0) {
+          addMessage(
+            "assistant",
+            result.clarification ||
+              "Mình chưa đọc rõ hết thông tin trên ảnh, bạn kiểm tra lại giúp mình nhé."
+          );
         } else {
-          // Các hàm khác (query, getTotal, etc.) - Text đã được stream, nếu rỗng thì set backup
-          if (!aiResponse.text) {
-             setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: "Đã xử lý xong." }
-                    : msg
-                )
-             );
-          }
+          showTransactionPreview([result.transactionPreview]);
+        }
+      } else if (looksLikeTransaction(userMessage)) {
+        const result = await aiApi.getTransactionPreview({
+          text: userMessage,
+          timeZone: getTimeZone(),
+        });
+
+        if (result.missingFields.length > 0) {
+          addMessage(
+            "assistant",
+            result.clarification ||
+              "Mình cần thêm thông tin để ghi giao dịch này, bạn nói rõ hơn nhé."
+          );
+        } else {
+          showTransactionPreview(result.previews);
         }
       } else {
-        // Text đã được stream, không cần làm gì thêm
+        const result = await aiApi.chat({
+          message: userMessage,
+          ledgerId: currentLedger.id,
+          conversationId: conversationId || undefined,
+          timeZone: getTimeZone(),
+        });
+
+        if (result.conversation?.id) setConversationId(result.conversation.id);
+        addMessage("assistant", result.message || "Đã xử lý xong.");
       }
     } catch (error) {
       console.error("Lỗi khi xử lý tin nhắn:", error);
-
-      // Xử lý các loại lỗi khác nhau
-      let errorMessage =
-        "Xin lỗi, có lỗi xảy ra khi xử lý yêu cầu của bạn. Vui lòng thử lại. Chi tiết: " + (error?.message || String(error));
-
-      if (
-        error.message?.includes("503") ||
-        error.message?.includes("UNAVAILABLE") ||
-        error.message?.includes("high demand")
-      ) {
-        errorMessage =
-          "⚠️ Model AI hiện đang quá tải (503). Vui lòng thử lại sau vài giây.";
-      } else if (
-        error.message?.includes("429") ||
-        error.message?.includes("quota") ||
-        error.message?.includes("rate-limit")
-      ) {
-        errorMessage =
-          "⚠️ Bạn đã vượt quá hạn mức sử dụng API (quota) của Gemini.\n\n" +
-          "Vui lòng:\n" +
-          "1. Kiểm tra quota tại: https://ai.dev/usage?tab=rate-limit\n" +
-          "2. Đợi một chút rồi thử lại\n" +
-          "3. Hoặc nâng cấp gói API của bạn\n\n" +
-          "Thông tin chi tiết: https://ai.google.dev/gemini-api/docs/rate-limits";
-      } else if (error.message?.includes("API Key")) {
-        errorMessage =
-          "❌ API Key không hợp lệ hoặc chưa được cấu hình.\n\n" +
-          "Vui lòng kiểm tra lại API Key trong cài đặt.";
-      } else if (
-        error.message?.includes("404") ||
-        error.message?.includes("not found")
-      ) {
-        errorMessage =
-          "❌ Model AI không tìm thấy.\n\n" +
-          "Có thể model đã thay đổi hoặc không khả dụng. Vui lòng thử lại sau.";
-      }
-
-      addMessage("assistant", errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Xác nhận và lưu transaction từ preview
-   */
-  const handleConfirmAdd = async () => {
-    // Xử lý nhiều transactions nếu có
-    if (previewTransactions.length > 0) {
-      try {
-        setIsLoading(true);
-        let successCount = 0;
-        let errorCount = 0;
-
-        for (const transaction of previewTransactions) {
-          try {
-            await addTransaction(transaction);
-            successCount++;
-          } catch (error) {
-            console.error("Lỗi khi lưu giao dịch:", error);
-            errorCount++;
-          }
-        }
-
-        setPreviewTransactions([]);
-
-        if (errorCount === 0) {
-          addMessage(
-            "assistant",
-            `✅ Đã lưu thành công ${successCount} giao dịch vào hệ thống!`
-          );
-        } else {
-          addMessage(
-            "assistant",
-            `⚠️ Đã lưu ${successCount} giao dịch, ${errorCount} giao dịch gặp lỗi.`
-          );
-        }
-      } catch (error) {
-        console.error("Lỗi khi lưu giao dịch:", error);
-        addMessage(
-          "assistant",
-          "❌ Có lỗi xảy ra khi lưu giao dịch. Vui lòng thử lại."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    // Xử lý 1 transaction như cũ
-    if (!previewTransaction) return;
-
-    try {
-      setIsLoading(true);
-      await addTransaction(previewTransaction);
-      setPreviewTransaction(null);
-      addMessage("assistant", "✅ Đã lưu giao dịch thành công vào hệ thống!");
-    } catch (error) {
-      console.error("Lỗi khi lưu giao dịch:", error);
       addMessage(
         "assistant",
-        "❌ Có lỗi xảy ra khi lưu giao dịch. Vui lòng thử lại."
+        error.message ||
+          "Xin lỗi, có lỗi xảy ra khi xử lý yêu cầu của bạn. Vui lòng thử lại."
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Hủy preview transaction
-   */
+  /** Xác nhận và lưu các giao dịch đang preview (gọi /ai/execute-action cho từng cái). */
+  const handleConfirmAdd = async () => {
+    if (previewTransactions.length === 0) return;
+
+    setIsLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const preview of previewTransactions) {
+      try {
+        await aiApi.executeAction("createTransaction", {
+          ledgerId: currentLedger.id,
+          type: preview.type,
+          amountVnd: preview.amountVnd,
+          categoryId: preview.categoryId,
+          subcategoryId: preview.subcategoryId || undefined,
+          transactionDate: preview.transactionDate,
+          note: preview.note || undefined,
+          paymentMethod: preview.paymentMethod,
+          paymentAccountId: preview.paymentAccountId || undefined,
+        });
+        successCount += 1;
+      } catch (error) {
+        console.error("Lỗi khi lưu giao dịch:", error);
+        errorCount += 1;
+      }
+    }
+
+    setPreviewTransactions([]);
+    if (successCount > 0) await refreshData();
+
+    if (errorCount === 0) {
+      addMessage(
+        "assistant",
+        `✅ Đã lưu thành công ${successCount} giao dịch vào hệ thống!`
+      );
+    } else {
+      addMessage(
+        "assistant",
+        `⚠️ Đã lưu ${successCount} giao dịch, ${errorCount} giao dịch gặp lỗi.`
+      );
+    }
+    setIsLoading(false);
+  };
+
+  /** Hủy preview giao dịch */
   const handleCancelPreview = () => {
-    setPreviewTransaction(null);
     setPreviewTransactions([]);
   };
 
-  /**
-   * Xóa toàn bộ lịch sử chat
-   */
+  /** Xóa hội thoại hiện tại trên UI (không xoá lịch sử đã lưu ở BE) */
   const handleClearChat = () => {
     setMessages([]);
-    setPreviewTransaction(null);
     setPreviewTransactions([]);
+    setConversationId(null);
   };
 
   return {
     messages,
     isLoading,
-    previewTransaction,
+    isHistoryLoading,
     previewTransactions,
-    hasKey,
+    paymentAccounts,
     messagesEndRef,
     handleSendMessage,
     handleConfirmAdd,

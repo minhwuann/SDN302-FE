@@ -106,12 +106,15 @@ export const AuthProvider = ({ children }) => {
     setDefaultLedger(null);
   }, []);
 
-  /** Cập nhật hồ sơ (displayName, avatarUrl). Tương thích chữ ký cũ. */
+  /** Cập nhật hồ sơ (displayName, avatarUrl, locale, timezone, settings). */
   const updateUserProfile = useCallback(async (data) => {
     const payload = {};
     if (data.displayName !== undefined) payload.displayName = data.displayName;
     if (data.photoURL !== undefined) payload.avatarUrl = data.photoURL;
     if (data.avatarUrl !== undefined) payload.avatarUrl = data.avatarUrl;
+    if (data.locale !== undefined) payload.locale = data.locale;
+    if (data.timezone !== undefined) payload.timezone = data.timezone;
+    if (data.settings !== undefined) payload.settings = data.settings;
     const { user, settings: s } = await authApi.updateMe(payload);
     setCurrentUser(user);
     if (s) setSettings(s);

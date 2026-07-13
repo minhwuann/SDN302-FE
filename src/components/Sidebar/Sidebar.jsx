@@ -13,6 +13,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { MENU_ITEMS, APP_NAME } from "./constants";
 import ProfileAvatar from "../ProfileAvatar";
 import LedgerSwitcher from "../LedgerSwitcher/LedgerSwitcher";
+import NotificationBell from "../Notifications/NotificationBell";
 
 /**
  * Component Sidebar - Navigation menu cho ứng dụng
@@ -89,9 +90,12 @@ const Sidebar = () => {
         </nav>
 
         {/* Actions */}
-        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800">
+        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center gap-2">
+          <NotificationBell />
           {/* Profile Avatar với dropdown đăng xuất */}
-          <ProfileAvatar onLogoutClick={onOpen} />
+          <div className="flex-1 min-w-0">
+            <ProfileAvatar onLogoutClick={onOpen} />
+          </div>
         </div>
       </aside>
 
@@ -110,8 +114,11 @@ const Sidebar = () => {
             {APP_NAME}
           </h1>
         </Link>
-        <div className="w-36">
-          <LedgerSwitcher />
+        <div className="flex items-center gap-2">
+          <NotificationBell isMobile />
+          <div className="w-36">
+            <LedgerSwitcher />
+          </div>
         </div>
       </header>
 
