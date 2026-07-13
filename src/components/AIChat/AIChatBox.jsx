@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardBody,
@@ -29,6 +29,8 @@ import {
   FileText,
   Clock,
   Lightbulb,
+  Mic,
+  ImageIcon,
 } from "lucide-react";
 import { useAIChat } from "./useAIChat";
 import ApiKeyModal from "./ApiKeyModal";
@@ -67,6 +69,59 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
     onOpenChange: onHelpChange,
   } = useDisclosure();
   const [inputMessage, setInputMessage] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = React.useRef(null);
+
+  useEffect(() => {
+    if ("webkitSpeechRecognition" in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = "vi-VN";
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputMessage((prev) => (prev ? prev + " " + transcript : transcript));
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } else {
+        alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome.");
+      }
+    }
+  };
+
+  const [attachedImage, setAttachedImage] = useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachedImage({
+          file: file,
+          dataUrl: reader.result,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = null;
+  };
 
   /**
    * Quick actions - gửi nhanh các câu lệnh phổ biến
@@ -113,9 +168,10 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
    */
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (inputMessage.trim() && !isLoading) {
-      handleSendMessage(inputMessage);
+    if ((inputMessage.trim() || attachedImage) && !isLoading) {
+      handleSendMessage(inputMessage, attachedImage);
       setInputMessage("");
+      setAttachedImage(null);
     }
   };
 
@@ -271,9 +327,16 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700"
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">
+                            <div className="text-sm whitespace-pre-wrap">
+                              {message.image && (
+                                <img
+                                  src={message.image}
+                                  alt="attached"
+                                  className="max-w-[200px] max-h-[200px] rounded-lg mb-2 object-contain bg-white/10"
+                                />
+                              )}
                               {message.content}
-                            </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -518,10 +581,45 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   {/* Input Area */}
                   {hasKey && (
                     <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
+                      {attachedImage && (
+                        <div className="relative mb-2 inline-block">
+                          <img
+                            src={attachedImage.dataUrl}
+                            alt="preview"
+                            className="h-16 rounded-md object-cover border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                            onClick={() => setAttachedImage(null)}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                       <form
                         onSubmit={handleSubmit}
                         className="flex gap-2 items-end"
                       >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={fileInputRef}
+                          onChange={handleImageUpload}
+                        />
+                        <Button
+                          type="button"
+                          color="default"
+                          isIconOnly
+                          variant="flat"
+                          onPress={() => fileInputRef.current?.click()}
+                          isDisabled={isLoading}
+                          aria-label="Tải ảnh lên"
+                          className="flex-shrink-0"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                        </Button>
                         <Textarea
                           value={inputMessage}
                           onValueChange={setInputMessage}
@@ -543,10 +641,22 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                           }}
                         />
                         <Button
+                          type="button"
+                          color={isListening ? "danger" : "default"}
+                          isIconOnly
+                          variant={isListening ? "solid" : "flat"}
+                          onPress={toggleListening}
+                          isDisabled={isLoading}
+                          aria-label="Nhập bằng giọng nói"
+                          className="flex-shrink-0"
+                        >
+                          <Mic className={`w-4 h-4 ${isListening ? "animate-pulse" : ""}`} />
+                        </Button>
+                        <Button
                           type="submit"
                           color="primary"
                           isIconOnly
-                          isDisabled={!inputMessage.trim() || isLoading}
+                          isDisabled={(!inputMessage.trim() && !attachedImage) || isLoading}
                           isLoading={isLoading}
                           aria-label="Gửi tin nhắn"
                           className="flex-shrink-0"

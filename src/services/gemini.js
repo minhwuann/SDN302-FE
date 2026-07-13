@@ -255,6 +255,18 @@ export const FUNCTION_DECLARATIONS = [
       required: ["transactionIds"],
     },
   },
+  {
+    name: "getBudgets",
+    description:
+      "Lấy danh sách các ngân sách chi tiêu hiện tại (budget). Giúp AI kiểm tra xem người dùng đã chi tiêu vượt quá giới hạn đã đặt ra cho các danh mục hay chưa.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "getGoals",
+    description:
+      "Lấy danh sách các mục tiêu tiết kiệm hiện tại (savings goals). Giúp AI đánh giá tiến độ tiết kiệm của người dùng.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
 ];
 
 /**
@@ -273,7 +285,9 @@ export const processUserMessage = async (
   apiKey,
   chatHistory = [],
   functionHandlers = {},
-  context = {}
+  context = {},
+  onStream = null,
+  attachedImage = null
 ) => {
   if (!apiKey) {
     throw new Error("API Key chưa được cấu hình");
@@ -338,82 +352,52 @@ export const processUserMessage = async (
       }
     });
 
+    const userParts = [{ text: userMessage || "Vui lòng phân tích hình ảnh đính kèm này." }];
+
+    if (attachedImage) {
+      // attachedImage.dataUrl format: "data:image/jpeg;base64,/9j/4AAQSk..."
+      const mimeType = attachedImage.dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const base64Data = attachedImage.dataUrl.split(',')[1];
+      userParts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data,
+        },
+      });
+    }
+
     // Thêm tin nhắn hiện tại
     contents.push({
       role: "user",
-      parts: [{ text: userMessage }],
+      parts: userParts,
     });
 
     // Lấy system instruction với ngày hiện tại được inject động
     const systemInstruction = getSystemInstruction();
 
-    // Gọi API với Function Calling - sử dụng ai.models.generateContent()
-    // Theo tài liệu: dùng config parameter với tools
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", // Revert to flash for stability (lite was 503ing)
+    // Gọi API với Function Calling và Streaming
+    const responseStream = await ai.models.generateContentStream({
+      model: "gemini-3.5-flash",
       contents: contents,
       systemInstruction: systemInstruction,
       config: config,
     });
 
-    // Kiểm tra xem AI có muốn gọi hàm không
     let functionCalls = [];
+    let text = "";
 
-    // Parse response từ @google/genai SDK
-    const responseData = response;
-
-    // Parse response structure
-
-    // Thử 1: Kiểm tra response.functionCalls (getter property)
-    try {
-      const functionCallsFromGetter = response.functionCalls;
-      if (
-        functionCallsFromGetter &&
-        Array.isArray(functionCallsFromGetter) &&
-        functionCallsFromGetter.length > 0
-      ) {
-        functionCalls = functionCallsFromGetter.map((fc) => ({
-          name: fc.name,
-          args: fc.args || {},
-        }));
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        text += chunk.text;
+        if (onStream) onStream(chunk.text);
       }
-    } catch {
-      // Ignore error, try next method
-    }
-
-    // Thử 2: Kiểm tra responseData.functionCalls trực tiếp
-    if (functionCalls.length === 0 && responseData.functionCalls) {
-      if (Array.isArray(responseData.functionCalls)) {
-        functionCalls = responseData.functionCalls.map((fc) => ({
-          name: fc.name,
-          args: fc.args || {},
-        }));
-      } else {
-        functionCalls = [
-          {
-            name: responseData.functionCalls.name,
-            args: responseData.functionCalls.args || {},
-          },
-        ];
-      }
-    }
-
-    // Thử 3: Kiểm tra trong candidates[0].content.parts
-    if (
-      functionCalls.length === 0 &&
-      responseData.candidates &&
-      responseData.candidates[0]
-    ) {
-      const candidate = responseData.candidates[0];
-      if (candidate.content && candidate.content.parts) {
-        for (const part of candidate.content.parts) {
-          if (part.functionCall) {
-            functionCalls.push({
-              name: part.functionCall.name,
-              args: part.functionCall.args || {},
-            });
-          }
-        }
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        functionCalls.push(
+          ...chunk.functionCalls.map((fc) => ({
+            name: fc.name,
+            args: fc.args || {},
+          }))
+        );
       }
     }
 
@@ -547,6 +531,22 @@ export const processUserMessage = async (
               }
               break;
 
+            case "getBudgets":
+              if (functionHandlers.handleGetBudgets && context.budgets) {
+                result = await functionHandlers.handleGetBudgets(args, context.budgets);
+              } else {
+                result = { success: false, error: "Handler không khả dụng" };
+              }
+              break;
+
+            case "getGoals":
+              if (functionHandlers.handleGetGoals && context.goals) {
+                result = await functionHandlers.handleGetGoals(args, context.goals);
+              } else {
+                result = { success: false, error: "Handler không khả dụng" };
+              }
+              break;
+
             default:
               result = {
                 success: false,
@@ -578,7 +578,7 @@ export const processUserMessage = async (
       const functionResponseContents = [
         ...contents,
         // Thêm model's response với function calls
-        response.candidates?.[0]?.content || {
+        {
           role: "model",
           parts: functionCalls.map((fc) => ({
             functionCall: {
@@ -602,28 +602,17 @@ export const processUserMessage = async (
       // Gọi AI để format kết quả - có fallback nếu API bị lỗi
       let finalText = "";
       try {
-        const finalResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash-lite",
+        const finalResponseStream = await ai.models.generateContentStream({
+          model: "gemini-3.5-flash",
           contents: functionResponseContents,
           systemInstruction: systemInstruction,
           config: config,
         });
 
-        finalText = finalResponse.text || "";
-
-        // Fallback: parse từ candidates nếu text không có
-        if (
-          !finalText &&
-          finalResponse.candidates &&
-          finalResponse.candidates[0]
-        ) {
-          const candidate = finalResponse.candidates[0];
-          if (candidate.content && candidate.content.parts) {
-            for (const part of candidate.content.parts) {
-              if (part.text) {
-                finalText += part.text;
-              }
-            }
+        for await (const chunk of finalResponseStream) {
+          if (chunk.text) {
+            finalText += chunk.text;
+            if (onStream) onStream(chunk.text);
           }
         }
       } catch (finalCallError) {
@@ -693,21 +682,6 @@ export const processUserMessage = async (
       };
     } else {
       // AI không gọi hàm, chỉ trả lời thông thường
-      // Response đã là GenerateContentResponse, có thể dùng response.text trực tiếp
-      let text = response.text || "";
-
-      // Fallback: parse từ candidates nếu text không có
-      if (!text && responseData.candidates && responseData.candidates[0]) {
-        const candidate = responseData.candidates[0];
-        if (candidate.content && candidate.content.parts) {
-          for (const part of candidate.content.parts) {
-            if (part.text) {
-              text += part.text;
-            }
-          }
-        }
-      }
-
       return {
         text: text,
         functionCalls: [],
@@ -761,7 +735,7 @@ QUAN TRỌNG:
 - Nếu có nhiều giao dịch, hãy phân tích theo danh mục, theo thời gian, v.v.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.5-flash",
       contents: prompt,
     });
 
@@ -858,7 +832,7 @@ export const extractReceiptData = async (imageBase64, mimeType, apiKey) => {
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite", // Optimized for Vision + Structured Output
+      model: "gemini-3.5-flash", // Optimized for Vision + Structured Output
       contents: {
         parts: [
           {

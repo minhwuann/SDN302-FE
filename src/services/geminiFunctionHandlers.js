@@ -845,3 +845,40 @@ export const handleDeleteMultipleTransactions = async (
     };
   }
 };
+
+export const handleGetBudgets = async (params, budgets) => {
+  try {
+    return {
+      success: true,
+      budgets: budgets.map(b => ({
+        category: b.category,
+        amount: b.amount,
+        spent: b.spent || 0,
+        remaining: b.amount - (b.spent || 0)
+      })),
+      count: budgets.length,
+      message: `Đã lấy danh sách ${budgets.length} ngân sách.`
+    };
+  } catch (error) {
+    return { success: false, error: "Lỗi lấy ngân sách: " + error.message };
+  }
+};
+
+export const handleGetGoals = async (params, goals) => {
+  try {
+    return {
+      success: true,
+      goals: goals.map(g => ({
+        name: g.name,
+        targetAmount: g.targetAmount,
+        currentAmount: g.currentAmount || 0,
+        deadline: g.deadline,
+        status: g.status
+      })),
+      count: goals.length,
+      message: `Đã lấy danh sách ${goals.length} mục tiêu.`
+    };
+  } catch (error) {
+    return { success: false, error: "Lỗi lấy mục tiêu: " + error.message };
+  }
+};

@@ -12,7 +12,11 @@ const STORAGE_KEY = "USER_GEMINI_API_KEY";
  * @returns {Object} Object chứa apiKey, setApiKey, và hasKey
  */
 export const useGeminiKey = () => {
-  const [apiKey, setApiKeyState] = useState("");
+  const defaultKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  
+  const [apiKey, setApiKeyState] = useState(() => {
+    return localStorage.getItem(STORAGE_KEY) || defaultKey;
+  });
 
   /**
    * Load API Key từ localStorage khi component mount
@@ -23,6 +27,8 @@ export const useGeminiKey = () => {
       const savedKey = localStorage.getItem(STORAGE_KEY);
       if (savedKey) {
         setApiKeyState(savedKey);
+      } else if (defaultKey) {
+        setApiKeyState(defaultKey);
       } else {
         setApiKeyState("");
       }

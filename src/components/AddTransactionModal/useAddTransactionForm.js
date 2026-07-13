@@ -90,7 +90,7 @@ export const useAddTransactionForm = ({
       date: editingTransaction.date,
       type: editingTransaction.type,
       category: isCategoryOther ? "other" : editingTransaction.category,
-      amount: formatAmountInput(editingTransaction.amount.toString()),
+      amount: editingTransaction.amount.toString(),
       note: editingTransaction.note || "",
       paymentMethod: editingTransaction.paymentMethod || "cash",
       bankName:
