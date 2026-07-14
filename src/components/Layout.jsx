@@ -42,12 +42,12 @@ const Layout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-64 pb-20 pt-16 lg:pt-0 overflow-y-auto">
+      <main className="flex-1 lg:ml-[236px] pb-24 lg:pb-8 pt-16 lg:pt-0 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           <Outlet context={{ onEditTransaction: handleOpenModal }} />
         </div>

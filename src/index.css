@@ -2,32 +2,105 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ẩn icon mắt mặc định của trình duyệt (Edge/Chrome) cho input password */
+@layer base {
+  :root {
+    /* Token tham chiếu (đồng bộ với tailwind.config.js) */
+    --vvv-app-bg: #f6f8fb;
+    --vvv-surface: #ffffff;
+    --vvv-surface-2: #f0f4f8;
+    --vvv-border: #e2e8f0;
+    --vvv-primary: #2563eb;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+    /* Số dạng tabular cho tiền tệ/biểu đồ mặc định toàn app */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Tiêu đề trang đồng nhất — cân bằng chữ Việt */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  /* Dùng cho số tiền, tổng, giá trị biểu đồ */
+  .vvv-tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Ẩn icon mắt/clear mặc định của trình duyệt cho input password */
 input::-ms-reveal,
 input::-ms-clear,
 input::-webkit-credentials-auto-fill-button {
   display: none !important;
 }
-
-/* Hide Edge/Chrome password reveal button */
 input[type="password"]::-webkit-reveal,
 input[type="password"]::-ms-reveal {
   display: none !important;
 }
 
-/* Ẩn focus ring/outline mặc định của trình duyệt bên trong HeroUI Input */
-input:focus,
-input:focus-visible,
-textarea:focus,
-textarea:focus-visible {
+/*
+ * Accessibility: chỉ triệt tiêu outline mặc định của browser cho con trỏ chuột,
+ * NHƯNG luôn giữ một focus ring rõ ràng cho điều hướng bàn phím (:focus-visible).
+ */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--vvv-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+ * HeroUI (React Aria) tự render focus ring riêng cho các thành phần tương tác
+ * qua [data-focus-visible]. Không thêm outline thứ 2 để tránh viền kép.
+ */
+[data-focus-visible="true"],
+[data-focus-visible="true"]:focus-visible {
+  outline: none;
+}
+
+/* Input/Textarea lồng trong HeroUI: ring hiển thị ở input-wrapper,
+   nên phần tử control bên trong không được có outline/box-shadow riêng. */
+[data-slot="input-wrapper"] input,
+[data-slot="inner-wrapper"] input,
+[data-slot="input-wrapper"] textarea,
+[data-slot="inner-wrapper"] textarea,
+[data-slot="input"] {
   outline: none !important;
   box-shadow: none !important;
 }
-
-/* Đảm bảo input bên trong HeroUI không có border riêng */
-[data-slot="input-wrapper"] input,
-[data-slot="inner-wrapper"] input {
-  border: none !important;
+[data-slot="input-wrapper"] input:focus-visible,
+[data-slot="inner-wrapper"] input:focus-visible,
+[data-slot="input-wrapper"] textarea:focus-visible,
+[data-slot="inner-wrapper"] textarea:focus-visible,
+[data-slot="input"]:focus-visible {
   outline: none !important;
-  box-shadow: none !important;
+}
+
+/* Tôn trọng người dùng giảm chuyển động */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

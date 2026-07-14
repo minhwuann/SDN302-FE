@@ -18,10 +18,11 @@ const ResultNotification = ({ result, type = "save" }) => {
 
   return (
     <Card
-      className={`border-0 shadow-sm ${
+      radius="lg"
+      className={`shadow-none border ${
         isSuccess
-          ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30"
-          : "bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/30 dark:to-orange-900/30"
+          ? "bg-success-50 border-success-200 dark:bg-success-500/10 dark:border-success-500/30"
+          : "bg-danger-50 border-danger-200 dark:bg-danger-500/10 dark:border-danger-500/30"
       }`}
     >
       <CardBody className="p-4">

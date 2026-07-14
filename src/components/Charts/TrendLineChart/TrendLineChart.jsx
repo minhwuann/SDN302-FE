@@ -80,7 +80,7 @@ const TrendLineChart = ({ ledgerId }) => {
   }, [days]);
 
   return (
-    <Card className="h-[400px] w-full shadow-sm border border-gray-100 dark:border-gray-800">
+    <Card className="h-[400px] w-full border border-divider bg-content1 shadow-none">
       <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
         <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100">
           Xu hướng chi tiêu

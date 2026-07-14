@@ -16,11 +16,12 @@ const RefreshButton = () => {
       size="sm"
       onClick={refreshData}
       disabled={isLoading}
-      className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+      className="text-default-600 hover:text-foreground"
       aria-label="Làm mới dữ liệu"
     >
       <RefreshCcw
-        className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`}
+        className={`w-[18px] h-[18px] ${isLoading ? "animate-spin" : ""}`}
+        strokeWidth={2}
       />
     </Button>
   );

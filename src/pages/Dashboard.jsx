@@ -1,19 +1,12 @@
 import { useState, useMemo } from "react";
-import { Tabs, Tab, Chip } from "@heroui/react";
-import {
-  List,
-  Calendar as CalendarIcon,
-  Sun,
-  Moon,
-  Sunset,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
+import { Tabs, Tab } from "@heroui/react";
+import { List, Calendar as CalendarIcon } from "lucide-react";
 import StatsCards from "../components/StatsCard";
 import TransactionList from "../components/Transactions/TransactionList/TransactionList";
 import CalendarView from "../components/Calendar/CalendarView";
 import RefreshButton from "../components/RefreshButton";
 import ThemeButton from "../components/ThemeButton";
+import PageHeader from "../components/ui/PageHeader";
 import { useTransactionsContext } from "../contexts/TransactionsContext";
 import { useOutletContext } from "react-router-dom";
 import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -32,25 +25,14 @@ function Dashboard() {
   const [viewMode, setViewMode] = useState("list");
 
   /**
-   * Lấy greeting và icon theo thời gian trong ngày
+   * Lời chào theo thời gian trong ngày (phụ, không icon màu trang trí)
    */
-  const getGreeting = () => {
+  const greetingText = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      return { text: "Chào buổi sáng", icon: Sun, color: "text-amber-500" };
-    } else if (hour >= 12 && hour < 18) {
-      return {
-        text: "Chào buổi chiều",
-        icon: Sunset,
-        color: "text-orange-500",
-      };
-    } else {
-      return { text: "Chào buổi tối", icon: Moon, color: "text-indigo-400" };
-    }
-  };
-
-  const greeting = getGreeting();
-  const GreetingIcon = greeting.icon;
+    if (hour >= 5 && hour < 12) return "Chào buổi sáng";
+    if (hour >= 12 && hour < 18) return "Chào buổi chiều";
+    return "Chào buổi tối";
+  }, []);
 
   /**
    * Thống kê nhanh cho tháng này
@@ -76,57 +58,26 @@ function Dashboard() {
 
   return (
     <div
-      className={`space-y-4 sm:space-y-6 transition-opacity duration-300 ${
+      className={`space-y-5 sm:space-y-6 transition-opacity duration-300 ${
         isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
       }`}
     >
-      {/* Header cải tiến */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            {/* Greeting */}
-            <div className="flex items-center gap-2 mb-1">
-              <GreetingIcon className={`w-5 h-5 ${greeting.color}`} />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {greeting.text}!
-              </span>
-            </div>
-            {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white tracking-tight">
-              Tổng Quan
-            </h1>
-            {/* Date */}
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              {format(new Date(), "EEEE, dd MMMM yyyy", { locale: vi })}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+      {/* Header */}
+      <PageHeader
+        eyebrow={`${greetingText} · ${format(new Date(), "EEEE, dd MMMM yyyy", {
+          locale: vi,
+        })}`}
+        title="Tổng quan tài chính"
+        subtitle={`${monthStats.transactionCount} giao dịch tháng này · trung bình ~${new Intl.NumberFormat(
+          "vi-VN"
+        ).format(monthStats.avgDaily)} VND/ngày`}
+        actions={
+          <>
             <ThemeButton />
             <RefreshButton />
-          </div>
-        </div>
-
-        {/* Quick Stats Pills */}
-        <div className="flex flex-wrap gap-2 mt-3">
-          <Chip
-            variant="flat"
-            color="default"
-            size="sm"
-            startContent={<TrendingDown className="w-3 h-3" />}
-          >
-            {monthStats.transactionCount} giao dịch tháng này
-          </Chip>
-          <Chip
-            variant="flat"
-            color="warning"
-            size="sm"
-            startContent={<TrendingUp className="w-3 h-3" />}
-          >
-            ~{new Intl.NumberFormat("vi-VN").format(monthStats.avgDaily)}{" "}
-            VND/ngày
-          </Chip>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Thẻ thống kê */}
       <StatsCards
@@ -136,19 +87,20 @@ function Dashboard() {
       />
 
       {/* Tabs: Danh sách / Lịch */}
-      <div className="mt-4 sm:mt-8">
+      <div className="mt-1">
         <Tabs
           selectedKey={viewMode}
           onSelectionChange={setViewMode}
           aria-label="Chế độ xem"
           color="primary"
           variant="solid"
+          radius="lg"
           classNames={{
-            tabList: "bg-slate-100 dark:bg-slate-800 p-1 rounded-xl",
-            cursor: "bg-white dark:bg-slate-700 shadow-sm",
-            tab: "px-4 py-2",
+            tabList: "bg-content2 p-1 rounded-[10px]",
+            cursor: "bg-content1 shadow-sm rounded-lg",
+            tab: "px-4 h-9",
             tabContent:
-              "group-data-[selected=true]:text-primary-600 dark:group-data-[selected=true]:text-primary-400 font-medium",
+              "group-data-[selected=true]:text-primary group-data-[selected=true]:font-semibold text-default-600 font-medium",
           }}
         >
           <Tab

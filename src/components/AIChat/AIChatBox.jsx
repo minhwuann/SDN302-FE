@@ -172,15 +172,17 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
         <ModalContent>
           {(onClose) => (
             <>
-              {/* Header với gradient */}
-              <ModalHeader className="flex items-center justify-between bg-gradient-to-r from-primary-500 via-primary-600 to-blue-600 text-white p-4 flex-shrink-0">
+              {/* Header trung tính (không gradient tím) */}
+              <ModalHeader className="flex items-center justify-between border-b border-divider bg-content1 p-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
-                    <Sparkles className="w-6 h-6 text-white" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
+                    <Sparkles className="w-5 h-5" strokeWidth={2} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold">Trợ lý Tài chính AI</h2>
-                    <p className="text-xs text-white/80 font-normal">
+                    <h2 className="text-base font-semibold text-foreground">
+                      Trợ lý Tài chính AI
+                    </h2>
+                    <p className="text-xs font-normal text-default-500">
                       Hỏi bất cứ điều gì về tài chính
                     </p>
                   </div>
@@ -193,7 +195,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                       variant="light"
                       onPress={handleClearChat}
                       aria-label="Xóa lịch sử chat"
-                      className="text-white/80 hover:text-white hover:bg-white/20"
+                      className="text-default-500 hover:text-foreground"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -204,7 +206,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                     variant="light"
                     onPress={onClose}
                     aria-label="Đóng"
-                    className="text-white/80 hover:text-white hover:bg-white/20"
+                    className="text-default-500 hover:text-foreground"
                   >
                     <X className="w-4 h-4" />
                   </Button>
@@ -212,22 +214,19 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
               </ModalHeader>
               <ModalBody className="p-0">
                 {/* Chat Messages */}
-                <div className="flex flex-col h-[60vh] sm:h-[55vh] bg-gray-50 dark:bg-gray-900">
+                <div className="flex flex-col h-[60vh] sm:h-[55vh] bg-background">
                   {messages.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-primary-50/50 to-transparent dark:from-primary-950/30">
-                      {/* AI Avatar với animation */}
-                      <div className="relative mb-6">
-                        <div className="absolute inset-0 bg-primary-400/20 rounded-full blur-xl animate-pulse"></div>
-                        <div className="relative bg-gradient-to-br from-primary-500 to-primary-600 p-4 rounded-full shadow-lg">
-                          <Sparkles className="w-10 h-10 text-white" />
-                        </div>
+                    <div className="flex-1 flex flex-col items-center justify-center p-6">
+                      {/* AI Avatar (phẳng, không glow) */}
+                      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50 text-primary dark:bg-primary-500/15">
+                        <Sparkles className="w-8 h-8" strokeWidth={1.75} />
                       </div>
 
                       {/* Welcome Message */}
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
                         Chào bạn! 👋
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 text-center max-w-md">
+                      <p className="text-sm text-default-600 mb-6 text-center max-w-md">
                         Tôi là Trợ lý Tài chính AI của bạn. Hãy hỏi tôi bất cứ
                         điều gì về tài chính của bạn!
                       </p>
@@ -255,7 +254,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                         size="sm"
                         startContent={<HelpCircle className="w-4 h-4" />}
                         onPress={onOpenHelp}
-                        className="text-gray-500 dark:text-gray-400"
+                        className="text-default-500"
                       >
                         Xem hướng dẫn sử dụng AI
                       </Button>
@@ -274,8 +273,8 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                           <div
                             className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                               message.role === "user"
-                                ? "bg-primary-600 text-white"
-                                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-content1 text-foreground border border-divider"
                             }`}
                           >
                             <div className="text-sm whitespace-pre-wrap">
@@ -293,15 +292,15 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                       ))}
                       {isLoading && (
                         <div className="flex justify-start">
-                          <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-2 border border-gray-200 dark:border-gray-700">
+                          <div className="bg-content1 rounded-2xl px-4 py-2 border border-divider">
                             <div className="flex gap-1">
-                              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                              <span className="w-2 h-2 bg-default-400 rounded-full animate-bounce"></span>
                               <span
-                                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                className="w-2 h-2 bg-default-400 rounded-full animate-bounce"
                                 style={{ animationDelay: "0.2s" }}
                               ></span>
                               <span
-                                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                className="w-2 h-2 bg-default-400 rounded-full animate-bounce"
                                 style={{ animationDelay: "0.4s" }}
                               ></span>
                             </div>
@@ -314,7 +313,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
 
                   {/* Preview Transaction Card(s) */}
                   {previewTransactions.length > 0 && (
-                    <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
+                    <div className="border-t border-divider p-3 sm:p-4 bg-content1">
                       <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                         {previewTransactions.length > 1
                           ? `Xem trước ${previewTransactions.length} giao dịch`
@@ -449,7 +448,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   )}
 
                   {/* Input Area */}
-                  <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-800">
+                  <div className="border-t border-divider p-3 sm:p-4 bg-content1">
                       {attachedImage && (
                         <div className="relative mb-2 inline-block">
                           <img
@@ -559,7 +558,7 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
               <ModalBody className="py-4">
                 <div className="space-y-4">
                   {/* Intro */}
-                  <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-950/30 dark:to-blue-950/30 p-4 rounded-xl">
+                  <div className="bg-content2 p-4 rounded-[10px]">
                     <p className="text-sm text-gray-700 dark:text-gray-300">
                       Trợ lý AI có thể giúp bạn quản lý tài chính bằng ngôn ngữ
                       tự nhiên. Dưới đây là những gì AI có thể làm:
@@ -569,9 +568,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                   {/* Capabilities */}
                   <div className="space-y-3">
                     {/* Add Transaction */}
-                    <div className="flex gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
-                      <div className="bg-emerald-500 p-2 rounded-lg">
-                        <PlusCircle className="w-5 h-5 text-white" />
+                    <div className="flex gap-3 p-3 bg-content2 rounded-[10px]">
+                      <div className="bg-primary-50 text-primary dark:bg-primary-500/15 p-2 rounded-[10px]">
+                        <PlusCircle className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -588,9 +587,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                     </div>
 
                     {/* Multiple Transactions */}
-                    <div className="flex gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                      <div className="bg-blue-500 p-2 rounded-lg">
-                        <FileText className="w-5 h-5 text-white" />
+                    <div className="flex gap-3 p-3 bg-content2 rounded-[10px]">
+                      <div className="bg-primary-50 text-primary dark:bg-primary-500/15 p-2 rounded-[10px]">
+                        <FileText className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -606,9 +605,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                     </div>
 
                     {/* Statistics */}
-                    <div className="flex gap-3 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                      <div className="bg-purple-500 p-2 rounded-lg">
-                        <BarChart3 className="w-5 h-5 text-white" />
+                    <div className="flex gap-3 p-3 bg-content2 rounded-[10px]">
+                      <div className="bg-primary-50 text-primary dark:bg-primary-500/15 p-2 rounded-[10px]">
+                        <BarChart3 className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -625,9 +624,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                     </div>
 
                     {/* Time Expressions */}
-                    <div className="flex gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
-                      <div className="bg-amber-500 p-2 rounded-lg">
-                        <Clock className="w-5 h-5 text-white" />
+                    <div className="flex gap-3 p-3 bg-content2 rounded-[10px]">
+                      <div className="bg-primary-50 text-primary dark:bg-primary-500/15 p-2 rounded-[10px]">
+                        <Clock className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -641,9 +640,9 @@ const AIChatBox = ({ isOpen, onOpenChange }) => {
                     </div>
 
                     {/* Q&A */}
-                    <div className="flex gap-3 p-3 bg-rose-50 dark:bg-rose-950/20 rounded-lg">
-                      <div className="bg-rose-500 p-2 rounded-lg">
-                        <MessageSquare className="w-5 h-5 text-white" />
+                    <div className="flex gap-3 p-3 bg-content2 rounded-[10px]">
+                      <div className="bg-primary-50 text-primary dark:bg-primary-500/15 p-2 rounded-[10px]">
+                        <MessageSquare className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm">

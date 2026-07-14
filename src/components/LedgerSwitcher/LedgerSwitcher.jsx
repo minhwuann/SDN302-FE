@@ -21,7 +21,7 @@ import { useTransactionsContext } from "../../contexts/TransactionsContext";
  * Component quản lý sổ thu chi (Ledger)
  * Hỗ trợ CRUD: Tạo, Đọc, Sửa, Xóa sổ thu chi
  */
-const LedgerSwitcher = () => {
+const LedgerSwitcher = ({ compact = false }) => {
   const {
     currentLedger,
     ledgers,
@@ -141,8 +141,8 @@ const LedgerSwitcher = () => {
         <>
           <ModalHeader className="flex flex-col gap-1 pb-0">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
-                <Trash2 size={24} />
+              <div className="p-2.5 rounded-[10px] bg-danger-50 text-danger-600 dark:bg-danger-500/15 dark:text-danger-400">
+                <Trash2 size={22} />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -194,16 +194,16 @@ const LedgerSwitcher = () => {
         <ModalHeader className="flex flex-col gap-1 pb-0">
           <div className="flex items-center gap-3">
             <div
-              className={`p-2.5 rounded-xl text-white shadow-lg ${
+              className={`p-2.5 rounded-[10px] ${
                 modalMode === "edit"
-                  ? "bg-gradient-to-br from-amber-500 to-orange-600"
-                  : "bg-gradient-to-br from-primary-500 to-indigo-600"
+                  ? "bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400"
+                  : "bg-primary-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-400"
               }`}
             >
               {modalMode === "edit" ? (
-                <Pencil size={24} />
+                <Pencil size={22} />
               ) : (
-                <Wallet size={24} />
+                <Wallet size={22} />
               )}
             </div>
             <div>
@@ -274,23 +274,40 @@ const LedgerSwitcher = () => {
     <>
       <Dropdown>
         <DropdownTrigger>
-          <Button
-            variant="light"
-            className="w-full justify-between bg-gray-100 dark:bg-gray-800 h-12 px-3 mb-2"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-primary/10 rounded-md text-primary">
-                <Wallet size={18} />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-xs text-gray-500">Sổ thu chi</span>
-                <span className="font-semibold text-sm truncate max-w-[120px]">
+          {compact ? (
+            <Button
+              variant="flat"
+              className="w-full justify-between bg-content2 h-9 px-2.5 rounded-[10px]"
+              aria-label="Chọn sổ thu chi"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Wallet size={16} className="text-primary flex-shrink-0" />
+                <span className="font-medium text-sm truncate">
                   {currentLedger?.name || "Sổ Chính"}
                 </span>
               </div>
-            </div>
-            <ChevronDown size={16} className="text-gray-500" />
-          </Button>
+              <ChevronDown size={15} className="text-default-500 flex-shrink-0" />
+            </Button>
+          ) : (
+            <Button
+              variant="flat"
+              className="w-full justify-between bg-content2 h-12 px-3 rounded-[10px]"
+              aria-label="Chọn sổ thu chi"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 bg-primary/10 rounded-lg text-primary flex-shrink-0">
+                  <Wallet size={16} />
+                </div>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-[11px] text-default-500">Sổ thu chi</span>
+                  <span className="font-semibold text-sm truncate max-w-[120px]">
+                    {currentLedger?.name || "Sổ Chính"}
+                  </span>
+                </div>
+              </div>
+              <ChevronDown size={16} className="text-default-500 flex-shrink-0" />
+            </Button>
+          )}
         </DropdownTrigger>
         <DropdownMenu
           aria-label="Ledger Actions"

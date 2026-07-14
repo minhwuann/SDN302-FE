@@ -145,7 +145,7 @@ const PaymentAccountManager = () => {
           {paymentAccounts.map((account) => (
             <div
               key={account.id}
-              className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md transition-shadow"
+              className="flex items-center justify-between p-3 bg-content1 rounded-[10px] border border-divider hover:bg-content2 transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span

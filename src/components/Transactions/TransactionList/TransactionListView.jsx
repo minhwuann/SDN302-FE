@@ -1,6 +1,7 @@
-import { Card, CardBody } from "@heroui/react";
+import { Receipt } from "lucide-react";
 import TransactionGroup from "./TransactionGroup";
 import { useTransactionList } from "./useTransactionList";
+import EmptyState from "../../ui/EmptyState";
 
 /**
  * Component hiển thị danh sách giao dịch dạng list (gom nhóm theo ngày)
@@ -11,13 +12,11 @@ const TransactionListView = ({ transactions, onEdit, onDelete }) => {
 
   if (sortedDates.length === 0) {
     return (
-      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
-        <CardBody className="p-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400">
-            Chưa có giao dịch nào
-          </p>
-        </CardBody>
-      </Card>
+      <EmptyState
+        icon={Receipt}
+        title="Chưa có giao dịch nào"
+        description="Các giao dịch bạn thêm sẽ xuất hiện tại đây, gom nhóm theo ngày."
+      />
     );
   }
 

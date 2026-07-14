@@ -195,7 +195,7 @@ const ShoppingListTab = () => {
           <Button variant="light" onPress={() => setActivePlan(null)}>
             ← Quay lại
           </Button>
-          <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h2 className="text-lg font-semibold text-foreground truncate px-2">
             {activePlan.name}
           </h2>
           <Button
@@ -209,34 +209,28 @@ const ShoppingListTab = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg">
-            <CardBody className="p-4">
-              <p className="text-white/80 text-sm">Ngân sách</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(activePlan.budget)}
-              </p>
-            </CardBody>
-          </Card>
-          <Card className="bg-white dark:bg-slate-800 border-l-4 border-blue-500 shadow-sm">
-            <CardBody className="p-4">
-              <p className="text-slate-500 text-sm">Dự kiến chi</p>
-              <p
-                className={`text-2xl font-bold ${
-                  remainingBudget < 0 ? "text-red-500" : "text-blue-600"
-                }`}
-              >
-                {formatCurrency(totalEstimated)}
-              </p>
-            </CardBody>
-          </Card>
-          <Card className="bg-white dark:bg-slate-800 border-l-4 border-green-500 shadow-sm">
-            <CardBody className="p-4">
-              <p className="text-slate-500 text-sm">Thực tế đã mua</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(totalBought)}
-              </p>
-            </CardBody>
-          </Card>
+          <div className="rounded-[14px] border border-divider bg-content1 p-4">
+            <p className="text-default-600 text-sm">Ngân sách</p>
+            <p className="vvv-tnum text-xl sm:text-2xl font-bold text-foreground">
+              {formatCurrency(activePlan.budget)}
+            </p>
+          </div>
+          <div className="rounded-[14px] border border-divider bg-content1 p-4">
+            <p className="text-default-600 text-sm">Dự kiến chi</p>
+            <p
+              className={`vvv-tnum text-xl sm:text-2xl font-bold ${
+                remainingBudget < 0 ? "text-danger-600" : "text-foreground"
+              }`}
+            >
+              {formatCurrency(totalEstimated)}
+            </p>
+          </div>
+          <div className="rounded-[14px] border border-divider bg-content1 p-4">
+            <p className="text-default-600 text-sm">Thực tế đã mua</p>
+            <p className="vvv-tnum text-xl sm:text-2xl font-bold text-success-600">
+              {formatCurrency(totalBought)}
+            </p>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -341,9 +335,9 @@ const ShoppingListTab = () => {
                   className="cursor-pointer"
                   onClick={() => openPlan(plan.id)}
                 >
-                  <Card className="h-48 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                  <Card radius="lg" className="h-48 bg-content1 border border-divider shadow-none hover:bg-content2 transition-colors relative overflow-hidden group">
                     <CardHeader className="flex gap-3">
-                      <div className="p-2 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg text-white">
+                      <div className="p-2 rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
                         <ShoppingBag size={20} />
                       </div>
                       <div className="flex flex-col items-start">
@@ -380,7 +374,7 @@ const ShoppingListTab = () => {
                         />
                       </div>
                       <div className="flex gap-2 mt-3">
-                        <Chip size="sm" variant="flat" color="secondary">
+                        <Chip size="sm" variant="flat" color="primary">
                           {plan.itemCount} món
                         </Chip>
                         <Chip
@@ -462,7 +456,7 @@ const CreatePlanModal = ({
         <>
           <ModalHeader className="flex flex-col gap-1 pb-0">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-orange-400 text-white shadow-lg">
+              <div className="p-2.5 rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
                 <ShoppingBag size={24} />
               </div>
               <div>

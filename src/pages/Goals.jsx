@@ -4,7 +4,8 @@
  */
 
 import { useState } from "react";
-import { Card, CardBody, Button, Spinner } from "@heroui/react";
+import { Button, Spinner } from "@heroui/react";
+import EmptyState from "../components/ui/EmptyState";
 import { Target, Plus, TrendingUp, CheckCircle2 } from "lucide-react";
 import useGoals from "../hooks/useGoals";
 import GoalCard from "../components/Goals/GoalCard";
@@ -79,42 +80,34 @@ const Goals = () => {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-primary-500 to-primary-600 text-white">
-          <CardBody className="p-4">
-            <p className="text-sm opacity-80">Tổng đã tiết kiệm</p>
-            <p className="text-xl font-bold">
-              {formatCurrency(stats.totalSaved)}
-            </p>
-          </CardBody>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <CardBody className="p-4">
-            <p className="text-sm opacity-80">Mục tiêu hoàn thành</p>
-            <p className="text-xl font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-5 h-5" />
-              {stats.completed}
-            </p>
-          </CardBody>
-        </Card>
-        <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
-          <CardBody className="p-4">
-            <p className="text-sm opacity-80">Đang thực hiện</p>
-            <p className="text-xl font-bold flex items-center gap-1">
-              <TrendingUp className="w-5 h-5" />
-              {stats.active}
-            </p>
-          </CardBody>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-          <CardBody className="p-4">
-            <p className="text-sm opacity-80">Tổng mục tiêu</p>
-            <p className="text-xl font-bold">
-              {formatCurrency(stats.totalTarget)}
-            </p>
-          </CardBody>
-        </Card>
+      {/* Stats Cards — bề mặt phẳng */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="rounded-[14px] border border-divider bg-content1 p-4">
+          <p className="text-sm text-default-600">Tổng đã tiết kiệm</p>
+          <p className="vvv-tnum mt-1 text-lg sm:text-xl font-bold text-foreground break-words">
+            {formatCurrency(stats.totalSaved)}
+          </p>
+        </div>
+        <div className="rounded-[14px] border border-divider bg-content1 p-4">
+          <p className="text-sm text-default-600">Mục tiêu hoàn thành</p>
+          <p className="vvv-tnum mt-1 flex items-center gap-1.5 text-lg sm:text-xl font-bold text-success-600">
+            <CheckCircle2 className="w-5 h-5" strokeWidth={2} />
+            {stats.completed}
+          </p>
+        </div>
+        <div className="rounded-[14px] border border-divider bg-content1 p-4">
+          <p className="text-sm text-default-600">Đang thực hiện</p>
+          <p className="vvv-tnum mt-1 flex items-center gap-1.5 text-lg sm:text-xl font-bold text-foreground">
+            <TrendingUp className="w-5 h-5 text-primary" strokeWidth={2} />
+            {stats.active}
+          </p>
+        </div>
+        <div className="rounded-[14px] border border-divider bg-content1 p-4">
+          <p className="text-sm text-default-600">Tổng mục tiêu</p>
+          <p className="vvv-tnum mt-1 text-lg sm:text-xl font-bold text-foreground break-words">
+            {formatCurrency(stats.totalTarget)}
+          </p>
+        </div>
       </div>
 
       {/* Active Goals */}
@@ -167,17 +160,11 @@ const Goals = () => {
 
       {/* Empty State */}
       {goals.length === 0 && (
-        <Card className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-          <CardBody className="py-12 text-center">
-            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Target className="w-8 h-8 text-primary-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Chưa có mục tiêu nào
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Hãy tạo mục tiêu tiết kiệm đầu tiên của bạn!
-            </p>
+        <EmptyState
+          icon={Target}
+          title="Chưa có mục tiêu nào"
+          description="Hãy tạo mục tiêu tiết kiệm đầu tiên của bạn!"
+          action={
             <Button
               color="primary"
               startContent={<Plus className="w-4 h-4" />}
@@ -185,8 +172,8 @@ const Goals = () => {
             >
               Tạo mục tiêu
             </Button>
-          </CardBody>
-        </Card>
+          }
+        />
       )}
 
       {/* Create/Edit Modal */}

@@ -36,21 +36,21 @@ const TransactionItem = ({ transaction, onEdit, onDelete }) => {
 
   const isIncome = transaction.type === "income";
   const amountColor = isIncome
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-rose-600 dark:text-rose-400";
+    ? "text-success-600 dark:text-success-500"
+    : "text-danger-600 dark:text-danger-500";
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   return (
     <>
       <div
-        className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 cursor-pointer"
+        className="flex items-center justify-between py-3 px-3 sm:px-4 hover:bg-content2 transition-colors border-b border-divider last:border-b-0 cursor-pointer"
         onClick={() => setIsDetailModalOpen(true)}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Emoji Icon với background color từ category */}
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+            className="w-10 h-10 rounded-[10px] flex items-center justify-center text-lg flex-shrink-0"
             style={{ backgroundColor: `${categoryColor}20` }}
           >
             {categoryEmoji}
@@ -73,8 +73,8 @@ const TransactionItem = ({ transaction, onEdit, onDelete }) => {
         </div>
         <div className="ml-4 flex items-center gap-3 flex-shrink-0">
           <div className="text-right">
-            <p className={`font-semibold ${amountColor}`}>
-              {isIncome ? "+" : "-"}
+            <p className={`vvv-tnum font-semibold ${amountColor}`}>
+              {isIncome ? "+" : "−"}
               {formatCurrency(Math.abs(transaction.amount))}
             </p>
             {transaction.paymentMethod === "transfer" &&

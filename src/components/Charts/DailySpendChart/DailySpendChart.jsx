@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload }) => {
     const data = payload[0];
     const fullDate = data.payload?.fullDate || data.payload?.date || "Ngày";
     return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+      <div className="bg-content1 border border-divider rounded-[10px] shadow-md p-3">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
           {fullDate}
         </p>
@@ -47,7 +47,7 @@ const DailySpendChart = ({ ledgerId, dateRange }) => {
 
   if (chartData.length === 0 || chartData.every((item) => item.value === 0)) {
     return (
-      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+      <Card className="border border-divider bg-content1 shadow-none">
         <CardBody className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {chartTitle}
@@ -62,7 +62,7 @@ const DailySpendChart = ({ ledgerId, dateRange }) => {
   }
 
   return (
-    <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+    <Card className="border border-divider bg-content1 shadow-none">
       <CardBody className="p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
           {chartTitle}

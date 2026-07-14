@@ -1,79 +1,89 @@
 import { Button } from "@heroui/react";
-import { Plus, X, Wallet, Sparkles } from "lucide-react";
+import { Plus, Wallet, Sparkles } from "lucide-react";
 import { useState } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
- * Floating Action Button dạng Speed Dial
- * Gom nhóm 2 chức năng: Thêm giao dịch và Chat với AI
+ * Floating Action Button dạng Speed Dial.
+ * Nút chính đặc màu primary (không glass). Các hành động con có nhãn rõ ràng
+ * và hỗ trợ bàn phím. Chuyển động tinh giản, đúng chức năng.
  */
 const FloatingActionButton = ({ onOpenAddTransaction, onOpenChat }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const toggleOpen = () => setIsOpen(!isOpen);
+  const toggleOpen = () => setIsOpen((v) => !v);
+
+  const actions = [
+    {
+      key: "add",
+      label: "Thêm giao dịch",
+      icon: Wallet,
+      onPress: () => {
+        onOpenAddTransaction();
+        setIsOpen(false);
+      },
+    },
+    {
+      key: "chat",
+      label: "Trợ lý AI",
+      icon: Sparkles,
+      onPress: () => {
+        onOpenChat();
+        setIsOpen(false);
+      },
+    },
+  ];
 
   return (
-    <div className="fixed bottom-28 sm:bottom-32 lg:bottom-6 right-4 sm:right-6 z-40 flex flex-col items-center gap-3">
+    <div className="fixed bottom-24 sm:bottom-28 lg:bottom-6 right-4 sm:right-6 z-40 flex flex-col items-end gap-2.5">
       <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Nút Chat AI - Glassmorphism Style */}
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.8 }}
-              transition={{ duration: 0.2, delay: 0.05 }}
-              className="flex items-center gap-2"
-            >
-              <Button
-                isIconOnly
-                className="shadow-lg backdrop-blur-md bg-transparent dark:bg-white/10 text-purple-600 dark:text-purple-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20"
-                onPress={() => {
-                  onOpenChat();
-                  setIsOpen(false);
-                }}
-                aria-label="Mở Trợ lý AI"
+        {isOpen &&
+          actions.map((action, i) => {
+            const Icon = action.icon;
+            return (
+              <motion.div
+                key={action.key}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.15, delay: i * 0.04 }}
+                className="flex items-center gap-2"
               >
-                <Sparkles className="w-5 h-5" />
-              </Button>
-            </motion.div>
-
-            {/* Nút Thêm Giao Dịch - Explicit Blue Styling */}
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-2"
-            >
-              <Button
-                isIconOnly
-                className="shadow-lg backdrop-blur-md bg-transparent dark:bg-white/10 text-blue-600 dark:text-blue-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20"
-                onPress={() => {
-                  onOpenAddTransaction();
-                  setIsOpen(false);
-                }}
-                aria-label="Thêm giao dịch thủ công"
-              >
-                <Wallet className="w-5 h-5" />
-              </Button>
-            </motion.div>
-          </>
-        )}
+                <span className="rounded-lg border border-divider bg-content1 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">
+                  {action.label}
+                </span>
+                <Button
+                  isIconOnly
+                  radius="full"
+                  className="h-11 w-11 bg-content1 text-primary border border-divider shadow-md hover:bg-content2"
+                  onPress={action.onPress}
+                  aria-label={action.label}
+                >
+                  <Icon className="h-5 w-5" strokeWidth={2} />
+                </Button>
+              </motion.div>
+            );
+          })}
       </AnimatePresence>
 
-      {/* Main Toggle Button */}
+      {/* Nút chính */}
       <Button
         isIconOnly
-        size="lg"
-        className={`shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-md bg-transparent dark:bg-white/10 text-blue-600 dark:text-blue-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20 ${
-          isOpen ? "rotate-180" : ""
-        }`}
+        radius="full"
+        color="primary"
+        className="h-14 w-14 shadow-lg"
         onPress={toggleOpen}
-        aria-label={isOpen ? "Đóng menu" : "Mở menu tác vụ"}
+        aria-label={isOpen ? "Đóng menu tác vụ" : "Mở menu tác vụ"}
+        aria-expanded={isOpen}
       >
-        {isOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+        <motion.span
+          animate={{ rotate: isOpen ? 135 : 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex items-center justify-center"
+        >
+          <Plus className="h-6 w-6" strokeWidth={2.25} />
+        </motion.span>
       </Button>
     </div>
   );

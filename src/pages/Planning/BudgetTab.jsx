@@ -3,8 +3,6 @@ import {
   Button,
   useDisclosure,
   Progress,
-  Card,
-  CardBody,
   Modal,
   ModalContent,
   ModalHeader,
@@ -117,55 +115,51 @@ const BudgetTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Tổng quan ngân sách */}
-      <Card className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-        <CardBody className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Wallet className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Tổng Ngân Sách Tháng</h2>
-                <p className="text-blue-100 text-sm">
-                  Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}
-                </p>
-              </div>
+      {/* Tổng quan ngân sách — bề mặt phẳng */}
+      <div className="rounded-[14px] border border-divider bg-content1 p-5 sm:p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
+              <Wallet className="w-5 h-5" strokeWidth={2} />
             </div>
-            <div className="text-right">
-              <p className="text-sm text-blue-100">Còn lại</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(
-                  Math.max(
-                    0,
-                    totalBudgetInfo.totalLimit - totalBudgetInfo.totalSpent
-                  )
-                )}
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Tổng ngân sách tháng
+              </h2>
+              <p className="text-default-600 text-sm">
+                Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}
               </p>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Đã chi: {formatCurrency(totalBudgetInfo.totalSpent)}</span>
-              <span>
-                Tổng hạn mức: {formatCurrency(totalBudgetInfo.totalLimit)}
-              </span>
-            </div>
-            <Progress
-              aria-label="Tiến độ chi tiêu tổng"
-              value={
-                (totalBudgetInfo.totalSpent / totalBudgetInfo.totalLimit) *
-                  100 || 0
-              }
-              className="h-2 bg-white/30"
-              classNames={{
-                indicator: "bg-white",
-              }}
-            />
+          <div className="text-right">
+            <p className="text-sm text-default-600">Còn lại</p>
+            <p className="vvv-tnum text-xl sm:text-2xl font-bold text-foreground">
+              {formatCurrency(
+                Math.max(
+                  0,
+                  totalBudgetInfo.totalLimit - totalBudgetInfo.totalSpent
+                )
+              )}
+            </p>
           </div>
-        </CardBody>
-      </Card>
+        </div>
+
+        <div className="space-y-2">
+          <div className="vvv-tnum flex justify-between text-sm text-default-600">
+            <span>Đã chi: {formatCurrency(totalBudgetInfo.totalSpent)}</span>
+            <span>Tổng hạn mức: {formatCurrency(totalBudgetInfo.totalLimit)}</span>
+          </div>
+          <Progress
+            aria-label="Tiến độ chi tiêu tổng"
+            color="primary"
+            value={
+              (totalBudgetInfo.totalSpent / totalBudgetInfo.totalLimit) * 100 ||
+              0
+            }
+            className="h-2"
+          />
+        </div>
+      </div>
 
       {/* Actions */}
       <div className="flex justify-end">
@@ -191,8 +185,8 @@ const BudgetTab = () => {
         ))}
 
         {budgets.length === 0 && !isLoading && (
-          <div className="col-span-full text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
-            <p className="text-slate-500 dark:text-slate-400 mb-4">
+          <div className="col-span-full text-center py-12 bg-content1 rounded-[14px] border border-dashed border-divider">
+            <p className="text-default-600 mb-4">
               Bạn chưa thiết lập ngân sách nào cho tháng này.
             </p>
             <Button variant="light" color="primary" onPress={handleOpenCreate}>

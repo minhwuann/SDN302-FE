@@ -12,6 +12,7 @@ import BudgetTab from "./BudgetTab"; // Use local BudgetTab
 import ShoppingListTab from "./ShoppingListTab";
 import ThemeButton from "../../components/ThemeButton";
 import RefreshButton from "../../components/RefreshButton";
+import PageHeader from "../../components/ui/PageHeader";
 
 // Lazy load các tab để tối ưu performance
 const GoalsTab = lazy(() => import("../Goals"));
@@ -30,20 +31,16 @@ const ChallengesTab = lazy(() => import("./ChallengesTab"));
 const Planning = () => {
   return (
     <div className="space-y-6 pb-24 md:pb-6">
-      <div className="flex justify-between items-start">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-white tracking-tight">
-            Kế Hoạch Tài Chính
-          </h1>
-          <p className="text-slate-500">
-            Quản lý ngân sách, mục tiêu tiết kiệm và kế hoạch mua sắm
-          </p>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <ThemeButton />
-          <RefreshButton />
-        </div>
-      </div>
+      <PageHeader
+        title="Kế hoạch tài chính"
+        subtitle="Quản lý ngân sách, mục tiêu tiết kiệm và kế hoạch mua sắm"
+        actions={
+          <>
+            <ThemeButton />
+            <RefreshButton />
+          </>
+        }
+      />
 
       <div className="flex w-full flex-col">
         <Tabs
@@ -56,7 +53,7 @@ const Planning = () => {
             cursor: "w-full bg-primary",
             tab: "max-w-fit px-0 h-12",
             tabContent:
-              "group-data-[selected=true]:text-primary font-medium text-base md:text-lg",
+              "group-data-[selected=true]:text-primary group-data-[selected=true]:font-semibold text-default-600 font-medium text-sm sm:text-base",
           }}
         >
           <Tab

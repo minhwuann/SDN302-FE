@@ -1,5 +1,4 @@
 import { NavLink, Link } from "react-router-dom";
-import { LogOut } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -16,25 +15,20 @@ import LedgerSwitcher from "../LedgerSwitcher/LedgerSwitcher";
 import NotificationBell from "../Notifications/NotificationBell";
 
 /**
- * Component Sidebar - Navigation menu cho ứng dụng
- * Hiển thị Desktop Sidebar và Mobile Bottom Navigation
- * Chỉ chứa UI, logic được xử lý bởi useSidebar hook
+ * Sidebar - Navigation cho ứng dụng.
+ * Desktop: sidebar phẳng cố định 236px, viền phải mảnh, active = nền xanh nhạt
+ * + icon/chữ xanh + chỉ báo dọc mảnh (không phải khối xanh đặc có shadow).
+ * Mobile: bottom navigation ổn định (không nhảy icon), tôn trọng safe-area.
  */
 const Sidebar = () => {
   const { logout } = useAuth();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
-  /**
-   * Xử lý đăng xuất khi người dùng xác nhận trong Modal
-   */
   const handleConfirmLogout = () => {
     logout()
-      .then(() => {
-        onOpenChange(false); // Đóng Modal sau khi đăng xuất thành công
-      })
+      .then(() => onOpenChange(false))
       .catch((error) => {
         console.error("Lỗi khi đăng xuất:", error);
-        // Vẫn đóng Modal ngay cả khi có lỗi để không làm người dùng bối rối
         onOpenChange(false);
       });
   };
@@ -42,31 +36,31 @@ const Sidebar = () => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-full w-[236px] bg-content1 border-r border-divider z-40">
         {/* Logo */}
-        <div className="flex flex-col w-full border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center justify-start h-16 w-full px-4">
-            <Link
-              to="/"
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-            >
-              <img
-                src="/logoApp.png"
-                alt="Logo App"
-                className="w-10 h-10 object-contain"
-              />
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                {APP_NAME}
-              </h1>
-            </Link>
-          </div>
-          <div className="px-4 pb-3">
-            <LedgerSwitcher />
-          </div>
+        <div className="flex items-center h-16 px-4 border-b border-divider">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 rounded-[10px] hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logoApp.png"
+              alt="Ví Vi Vu"
+              className="w-9 h-9 object-contain"
+            />
+            <span className="text-lg font-bold tracking-tight text-foreground">
+              {APP_NAME}
+            </span>
+          </Link>
+        </div>
+
+        {/* Ledger switcher */}
+        <div className="px-3 pt-3">
+          <LedgerSwitcher />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -75,24 +69,35 @@ const Sidebar = () => {
                 to={item.path}
                 end={item.path === "/"}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  `relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm transition-colors ${
                     isActive
-                      ? "bg-primary-500 text-white font-medium shadow-md"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "bg-primary-50 text-primary-700 font-semibold dark:bg-primary-500/10 dark:text-primary-300"
+                      : "text-default-700 dark:text-default-600 hover:bg-content2 hover:text-foreground"
                   }`
                 }
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary" />
+                    )}
+                    <Icon
+                      className={`h-5 w-5 flex-shrink-0 ${
+                        isActive ? "text-primary" : ""
+                      }`}
+                      strokeWidth={2}
+                    />
+                    <span>{item.label}</span>
+                  </>
+                )}
               </NavLink>
             );
           })}
         </nav>
 
-        {/* Actions */}
-        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center gap-2">
+        {/* Actions: notification + profile */}
+        <div className="px-3 py-3 border-t border-divider flex items-center gap-1">
           <NotificationBell />
-          {/* Profile Avatar với dropdown đăng xuất */}
           <div className="flex-1 min-w-0">
             <ProfileAvatar onLogoutClick={onOpen} />
           </div>
@@ -100,32 +105,35 @@ const Sidebar = () => {
       </aside>
 
       {/* Mobile Top Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-50 px-4 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-content1/95 backdrop-blur-sm border-b border-divider z-50 px-4 flex items-center justify-between">
         <Link
           to="/"
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 rounded-[10px] hover:opacity-80 transition-opacity"
         >
           <img
             src="/logoApp.png"
-            alt="Logo"
+            alt="Ví Vi Vu"
             className="w-8 h-8 object-contain"
           />
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+          <span className="text-base font-bold tracking-tight text-foreground">
             {APP_NAME}
-          </h1>
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <NotificationBell isMobile />
-          <div className="w-36">
-            <LedgerSwitcher />
+        <div className="flex items-center gap-1">
+          <div className="w-[148px]">
+            <LedgerSwitcher compact />
           </div>
+          <NotificationBell isMobile />
         </div>
       </header>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 pb-safe shadow-lg">
-        <div className="grid grid-cols-5 h-16 pb-safe">
-          {/* Menu Items */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-content1/95 backdrop-blur-sm border-t border-divider z-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Điều hướng chính"
+      >
+        <div className="grid grid-cols-5 h-16">
           {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -134,36 +142,28 @@ const Sidebar = () => {
                 to={item.path}
                 end={item.path === "/"}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center h-full transition-all duration-300 relative group ${
+                  `relative flex flex-col items-center justify-center gap-1 h-full min-h-[44px] transition-colors ${
                     isActive
-                      ? "text-primary-600 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      ? "text-primary"
+                      : "text-default-500 dark:text-default-500 hover:text-foreground"
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <div
-                      className={`p-1.5 rounded-xl transition-all duration-300 ${
-                        isActive
-                          ? "bg-primary-500 text-white transform -translate-y-1 shadow-md"
-                          : "group-hover:bg-gray-100 dark:group-hover:bg-gray-800"
-                      }`}
-                    >
-                      <Icon
-                        className={`w-5 h-5 ${
-                          isActive ? "stroke-[2.5px]" : "stroke-[1.5px]"
-                        }`}
-                      />
-                    </div>
+                    {isActive && (
+                      <span className="absolute top-0 h-0.5 w-8 rounded-b-full bg-primary" />
+                    )}
+                    <Icon
+                      className="h-5 w-5"
+                      strokeWidth={isActive ? 2.25 : 1.75}
+                    />
                     <span
-                      className={`text-[10px] font-medium mt-1 transition-all ${
-                        isActive ? "opacity-100 font-semibold" : "opacity-70"
+                      className={`text-[10px] leading-none ${
+                        isActive ? "font-semibold" : "font-medium"
                       }`}
                     >
-                      {item.label === "Công cụ Dữ liệu"
-                        ? "Công cụ"
-                        : item.label}
+                      {item.label === "Công cụ Dữ liệu" ? "Công cụ" : item.label}
                     </span>
                   </>
                 )}
@@ -171,8 +171,8 @@ const Sidebar = () => {
             );
           })}
 
-          {/* Profile Avatar - 5th item */}
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+          {/* Profile - item thứ 5 */}
+          <div className="flex flex-col items-center justify-center h-full min-h-[44px] text-default-500">
             <ProfileAvatar onLogoutClick={onOpen} isMobile />
           </div>
         </div>
@@ -182,33 +182,22 @@ const Sidebar = () => {
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        backdrop="blur"
         placement="center"
       >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                Đăng xuất
-              </ModalHeader>
+              <ModalHeader className="flex flex-col gap-1">Đăng xuất</ModalHeader>
               <ModalBody>
-                <p className="text-gray-700 dark:text-gray-300">
+                <p className="text-default-700 dark:text-default-600">
                   Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?
                 </p>
               </ModalBody>
               <ModalFooter>
-                <Button
-                  variant="light"
-                  onPress={onClose}
-                  className="text-gray-700 dark:text-gray-300"
-                >
+                <Button variant="light" onPress={onClose}>
                   Hủy
                 </Button>
-                <Button
-                  color="danger"
-                  onPress={handleConfirmLogout}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
+                <Button color="danger" onPress={handleConfirmLogout}>
                   Đăng xuất
                 </Button>
               </ModalFooter>

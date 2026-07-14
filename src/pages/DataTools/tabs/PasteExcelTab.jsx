@@ -53,7 +53,7 @@ const PasteExcelTab = ({
   return (
     <div className="space-y-4 mt-4">
       {/* Download Sample Card */}
-      <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-0">
+      <Card className="border border-divider bg-content1">
         <CardBody className="p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

@@ -44,7 +44,7 @@ const DirectInputTab = ({
   return (
     <div className="space-y-4 mt-4">
       {/* Header Card */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-0">
+      <Card className="border border-divider bg-content1">
         <CardBody className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

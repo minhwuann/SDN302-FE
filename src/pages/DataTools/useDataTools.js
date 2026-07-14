@@ -121,6 +121,7 @@ export const useDataTools = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingToSheets, setIsExportingToSheets] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
   const [exportResult, setExportResult] = useState(null);
@@ -559,7 +560,7 @@ export const useDataTools = () => {
       return;
     }
 
-    setIsExporting(true);
+    setIsExportingPdf(true);
     setExportResult(null);
 
     try {
@@ -579,7 +580,7 @@ export const useDataTools = () => {
         error: `Có lỗi: ${error.message || "Không xác định"}`,
       });
     } finally {
-      setIsExporting(false);
+      setIsExportingPdf(false);
     }
   };
 
@@ -738,6 +739,7 @@ export const useDataTools = () => {
     isAnalyzing,
     isSaving,
     isExporting,
+    isExportingPdf,
     isExportingToSheets,
     saveResult,
     exportResult,

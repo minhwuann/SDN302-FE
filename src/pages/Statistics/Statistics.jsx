@@ -15,50 +15,13 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  ArrowUpRight,
-  ArrowDownRight,
   Receipt,
   PieChart,
   Activity,
 } from "lucide-react";
-import { formatCurrency } from "../../utils/formatCurrency";
-
-/**
- * Component Summary Stats Card
- */
-const StatCard = ({
-  title,
-  value,
-  // eslint-disable-next-line no-unused-vars
-  icon: IconComponent,
-  gradient,
-  trend,
-  trendValue,
-}) => (
-  <Card className={`${gradient} text-white shadow-lg border-none`}>
-    <CardBody className="p-5">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-sm opacity-90 mb-1">{title}</p>
-          <p className="text-2xl font-bold tracking-tight">{value}</p>
-          {trend && (
-            <div className="flex items-center gap-1 mt-2 text-xs opacity-90">
-              {trend === "up" ? (
-                <ArrowUpRight className="w-3 h-3" />
-              ) : (
-                <ArrowDownRight className="w-3 h-3" />
-              )}
-              <span>{trendValue}</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 bg-white/20 rounded-xl">
-          <IconComponent className="w-6 h-6" />
-        </div>
-      </div>
-    </CardBody>
-  </Card>
-);
+import PageHeader from "../../components/ui/PageHeader";
+import SectionHeader from "../../components/ui/SectionHeader";
+import MetricTile from "../../components/ui/MetricTile";
 
 /**
  * Component trang Thống Kê
@@ -108,74 +71,58 @@ function Statistics() {
       }`}
     >
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 dark:text-white flex items-center gap-3 tracking-tight">
-            <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-xl">
-              <BarChart3 className="w-6 h-6 text-primary-500" />
-            </div>
-            Thống Kê
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 ml-14">
-            Phân tích chi tiết thu chi của bạn
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeButton />
-          <RefreshButton />
-        </div>
-      </div>
+      <PageHeader
+        title="Thống kê"
+        subtitle="Phân tích chi tiết thu chi của bạn"
+        actions={
+          <>
+            <ThemeButton />
+            <RefreshButton />
+          </>
+        }
+      />
 
       {/* Date Filter */}
       <DateFilterBar onDateRangeChange={setDateRange} />
 
       {dateRangeText && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 italic -mt-2">
-          {dateRangeText}
-        </p>
+        <p className="text-sm text-default-500 -mt-2">{dateRangeText}</p>
       )}
 
-      {/* Summary Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Tổng thu nhập"
-          value={formatCurrency(stats.income)}
+      {/* Summary Stats — bề mặt phẳng, màu ngữ nghĩa chỉ ở con số */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <MetricTile
+          label="Tổng thu nhập"
+          value={stats.income}
+          tone="income"
           icon={TrendingUp}
-          gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          sign="+"
         />
-        <StatCard
-          title="Tổng chi tiêu"
-          value={formatCurrency(stats.expense)}
+        <MetricTile
+          label="Tổng chi tiêu"
+          value={stats.expense}
+          tone="expense"
           icon={TrendingDown}
-          gradient="bg-gradient-to-br from-rose-500 to-rose-600"
+          sign="−"
         />
-        <StatCard
-          title="Chênh lệch"
-          value={formatCurrency(stats.balance)}
+        <MetricTile
+          label="Chênh lệch"
+          value={stats.balance}
+          tone="neutral"
           icon={Wallet}
-          gradient={
-            stats.balance >= 0
-              ? "bg-gradient-to-br from-blue-500 to-blue-600"
-              : "bg-gradient-to-br from-orange-500 to-orange-600"
-          }
+          sign={stats.balance < 0 ? "−" : ""}
         />
-        <StatCard
-          title="Số giao dịch"
+        <MetricTile
+          label="Số giao dịch"
           value={stats.transactionCount.toLocaleString("vi-VN")}
+          tone="neutral"
           icon={Receipt}
-          gradient="bg-gradient-to-br from-purple-500 to-purple-600"
         />
       </div>
 
       {/* Charts Section */}
       <div className="space-y-6">
-        {/* Section Header - Cơ cấu & Chi tiêu hàng ngày */}
-        <div className="flex items-center gap-2 pt-2">
-          <PieChart className="w-5 h-5 text-primary-500" />
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Phân tích theo danh mục
-          </h2>
-        </div>
+        <SectionHeader icon={PieChart} title="Phân tích theo danh mục" />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Biểu đồ tròn */}
@@ -190,19 +137,14 @@ function Statistics() {
         </div>
 
         {/* Section Header - Biến động */}
-        <div className="flex items-center gap-2 pt-4">
-          <Activity className="w-5 h-5 text-primary-500" />
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Biến động thu chi
-          </h2>
-        </div>
+        <SectionHeader icon={Activity} title="Biến động thu chi" className="pt-2" />
 
         {/* Biểu đồ Biến động Thu Chi - Full Width */}
-        <Card className="bg-white dark:bg-slate-900 shadow-md border border-gray-100 dark:border-gray-800">
-          <CardHeader className="flex justify-between items-center px-6 pt-5 pb-0">
+        <Card className="bg-content1 border border-divider shadow-none" radius="lg">
+          <CardHeader className="flex justify-between items-center px-5 sm:px-6 pt-5 pb-0">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary-500" />
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+              <BarChart3 className="w-[18px] h-[18px] text-primary" strokeWidth={2} />
+              <h3 className="text-base font-semibold text-foreground">
                 So sánh Thu - Chi
               </h3>
             </div>

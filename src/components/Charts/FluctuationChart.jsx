@@ -48,7 +48,7 @@ const CustomTooltipContent = ({ active, payload, label, viewMode }) => {
     const balance = income - expense;
 
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+      <div className="bg-content1 p-3 rounded-[10px] shadow-md border border-divider">
         <p className="font-semibold text-slate-700 dark:text-white mb-2">
           {viewMode === "daily" ? `Ngày ${label}` : label}
         </p>

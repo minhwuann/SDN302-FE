@@ -17,6 +17,7 @@ import CategoryManager from "../../components/CategoryManager/CategoryManager";
 import PaymentAccountManager from "../../components/PaymentAccountManager/PaymentAccountManager";
 import ThemeButton from "../../components/ThemeButton";
 import RefreshButton from "../../components/RefreshButton";
+import PageHeader from "../../components/ui/PageHeader";
 
 /**
  * DataTools - Trang chính Công cụ Dữ liệu
@@ -46,6 +47,7 @@ function DataTools() {
     // Export Tab
     transactionsCount,
     isExporting,
+    isExportingPdf,
     isExportingToSheets,
     exportResult,
     sheetsExportResult,
@@ -62,30 +64,21 @@ function DataTools() {
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden pb-24 md:pb-6">
       {/* Header */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
-              <Database className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                Công Cụ Dữ Liệu
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Nhập/Xuất dữ liệu • Excel • Google Sheets
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <ThemeButton />
-            <RefreshButton />
-          </div>
-        </div>
+      <div className="mb-4 sm:mb-6 space-y-3">
+        <PageHeader
+          title="Công cụ dữ liệu"
+          subtitle="Nhập / xuất dữ liệu · Excel · Google Sheets"
+          actions={
+            <>
+              <ThemeButton />
+              <RefreshButton />
+            </>
+          }
+        />
 
         {/* Mobile Tip */}
-        <div className="sm:hidden mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-xs text-blue-700 dark:text-blue-400">
+        <div className="sm:hidden p-3 bg-content2 border border-divider rounded-[10px]">
+          <p className="text-xs text-default-600">
             💡 <strong>Mẹo:</strong> Vuốt ngang trên bảng nhập liệu để xem thêm
             các cột. Xoay ngang điện thoại sẽ tiện hơn!
           </p>
@@ -171,6 +164,7 @@ function DataTools() {
             onExportPDF={handleExportPDF}
             onCopyToClipboard={handleCopyToClipboard}
             isExporting={isExporting}
+            isExportingPdf={isExportingPdf}
             isExportingToSheets={isExportingToSheets}
             exportResult={exportResult}
             sheetsExportResult={sheetsExportResult}

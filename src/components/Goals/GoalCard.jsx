@@ -79,12 +79,13 @@ const GoalCard = ({ goal, onAddMoney, onEdit, onDelete }) => {
   return (
     <>
       <Card
-        className={`bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border ${
+        radius="lg"
+        className={`bg-content1 shadow-none border ${
           isCompleted
-            ? "border-green-500/50"
+            ? "border-success-300 dark:border-success-500/40"
             : isOverdue
-            ? "border-red-500/50"
-            : "border-gray-200 dark:border-gray-700"
+            ? "border-danger-300 dark:border-danger-500/40"
+            : "border-divider"
         }`}
       >
         <CardBody className="p-4">

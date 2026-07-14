@@ -14,7 +14,10 @@ const ErrorList = ({ errors = [] }) => {
   if (errors.length === 0) return null;
 
   return (
-    <Card className="border-0 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/30 dark:to-orange-900/30">
+    <Card
+      radius="lg"
+      className="shadow-none border bg-danger-50 border-danger-200 dark:bg-danger-500/10 dark:border-danger-500/30"
+    >
       <CardBody className="p-4">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-red-100 dark:bg-red-800/50 rounded-lg">

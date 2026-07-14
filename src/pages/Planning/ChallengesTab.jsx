@@ -166,37 +166,31 @@ const ChallengesTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="bg-blue-50 dark:bg-blue-900/20">
-          <CardBody className="p-4 text-center">
-            <Trophy size={24} className="mx-auto text-blue-600 mb-2" />
-            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-              {stats.activeCount}
-            </p>
-            <p className="text-xs text-blue-600">Đang thực hiện</p>
-          </CardBody>
-        </Card>
+      {/* Stats — bề mặt phẳng */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="rounded-[14px] border border-divider bg-content1 p-4 text-center">
+          <Trophy size={22} className="mx-auto text-primary mb-2" />
+          <p className="vvv-tnum text-xl sm:text-2xl font-bold text-foreground">
+            {stats.activeCount}
+          </p>
+          <p className="text-xs text-default-600">Đang thực hiện</p>
+        </div>
 
-        <Card className="bg-green-50 dark:bg-green-900/20">
-          <CardBody className="p-4 text-center">
-            <Target size={24} className="mx-auto text-green-600 mb-2" />
-            <p className="text-2xl font-bold text-green-700 dark:text-green-400">
-              {stats.completedCount}
-            </p>
-            <p className="text-xs text-green-600">Hoàn thành</p>
-          </CardBody>
-        </Card>
+        <div className="rounded-[14px] border border-divider bg-content1 p-4 text-center">
+          <Target size={22} className="mx-auto text-success-600 mb-2" />
+          <p className="vvv-tnum text-xl sm:text-2xl font-bold text-foreground">
+            {stats.completedCount}
+          </p>
+          <p className="text-xs text-default-600">Hoàn thành</p>
+        </div>
 
-        <Card className="bg-amber-50 dark:bg-amber-900/20">
-          <CardBody className="p-4 text-center">
-            <Flame size={24} className="mx-auto text-amber-600 mb-2" />
-            <p className="text-lg font-bold text-amber-700 dark:text-amber-400">
-              {formatMoney(stats.totalSaved)}
-            </p>
-            <p className="text-xs text-amber-600">Đã tiết kiệm</p>
-          </CardBody>
-        </Card>
+        <div className="rounded-[14px] border border-divider bg-content1 p-4 text-center">
+          <Flame size={22} className="mx-auto text-default-500 mb-2" />
+          <p className="vvv-tnum text-base sm:text-lg font-bold text-foreground break-words">
+            {formatMoney(stats.totalSaved)}
+          </p>
+          <p className="text-xs text-default-600">Đã tiết kiệm</p>
+        </div>
       </div>
 
       {/* Add Button */}

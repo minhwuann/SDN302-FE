@@ -31,6 +31,7 @@ import { Link } from "react-router-dom";
 import * as authApi from "../../services/authApi";
 import { renderGoogleButton, isGoogleConfigured } from "../../services/googleAuth";
 import SecuritySettings from "../../components/SecuritySettings/SecuritySettings";
+import PageHeader from "../../components/ui/PageHeader";
 
 const GOOGLE_LINK_ERROR_MESSAGES = {
   GOOGLE_ALREADY_LINKED: "Tài khoản này đã được liên kết với Google.",
@@ -172,24 +173,18 @@ const Profile = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-            Quản lý Tài khoản
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Cập nhật thông tin và cài đặt ứng dụng
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Quản lý tài khoản"
+        subtitle="Cập nhật thông tin và cài đặt ứng dụng"
+      />
 
       {/* Thông báo Feedback */}
       {message.content && (
         <div
-          className={`p-3 rounded-lg text-sm font-medium ${
+          className={`p-3 rounded-[10px] text-sm font-medium ${
             message.type === "success"
-              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
+              : "bg-danger-50 text-danger-700 dark:bg-danger-500/15 dark:text-danger-400"
           }`}
         >
           {message.content}
@@ -197,11 +192,11 @@ const Profile = () => {
       )}
 
       {/* 1. Thông tin cá nhân */}
-      <Card className="shadow-sm">
-        <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+      <Card className="border border-divider shadow-none" radius="lg">
+        <CardHeader className="bg-content2 px-6 py-4 border-b border-divider">
           <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-primary-500" />
-            <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
+            <User className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">
               Thông tin cá nhân
             </h2>
           </div>
@@ -317,10 +312,10 @@ const Profile = () => {
           {/* Liên kết tài khoản Google */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="font-medium text-slate-800 dark:text-white">
+              <p className="font-medium text-foreground">
                 Tài khoản Google
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-default-600">
                 {currentUser?.googleSub
                   ? "Bạn có thể đăng nhập bằng email/mật khẩu hoặc Google."
                   : "Liên kết để có thể đăng nhập nhanh bằng Google."}
@@ -337,7 +332,7 @@ const Profile = () => {
             ) : isGoogleConfigured() ? (
               <div ref={googleLinkBtnRef} className={linkingGoogle ? "opacity-50 pointer-events-none" : ""} />
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-default-500">
                 Đăng nhập Google chưa được cấu hình.
               </p>
             )}
@@ -346,12 +341,12 @@ const Profile = () => {
       </Card>
 
       {/* 2. Cài đặt Ứng dụng */}
-      <Card className="shadow-sm">
-        <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+      <Card className="border border-divider shadow-none" radius="lg">
+        <CardHeader className="bg-content2 px-6 py-4 border-b border-divider">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 flex items-center justify-center">
               <svg
-                className="w-5 h-5 text-slate-500"
+                className="w-5 h-5 text-default-600"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -361,30 +356,24 @@ const Profile = () => {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
+            <h2 className="text-lg font-semibold text-foreground">
               Cài đặt ứng dụng
             </h2>
           </div>
         </CardHeader>
         <CardBody className="p-0">
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="divide-y divide-divider">
             {/* Theme Toggle */}
             <div className="flex items-center justify-between p-6">
               <div className="flex items-center gap-3">
-                <div
-                  className={`p-2 rounded-lg ${
-                    theme === "dark"
-                      ? "bg-slate-700 text-yellow-400"
-                      : "bg-orange-100 text-orange-500"
-                  }`}
-                >
+                <div className="p-2 rounded-[10px] bg-content2 text-default-600">
                   {theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-white">
+                  <p className="font-medium text-foreground">
                     Giao diện (Theme)
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-default-600">
                     Chuyển đổi giữa Sáng và Tối
                   </p>
                 </div>
@@ -394,7 +383,7 @@ const Profile = () => {
                 onValueChange={(isSelected) =>
                   setTheme(isSelected ? "dark" : "light")
                 }
-                color="secondary"
+                color="primary"
                 size="md"
               />
             </div>
@@ -402,14 +391,14 @@ const Profile = () => {
             {/* Nhắc nhở hàng ngày */}
             <div className="flex items-center justify-between p-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
+                <div className="p-2 rounded-[10px] bg-content2 text-default-600">
                   <Bell size={20} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-white">
+                  <p className="font-medium text-foreground">
                     Nhắc ghi chép hàng ngày
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-default-600">
                     Nhắc nếu bạn quên ghi chép thu chi trong ngày
                   </p>
                 </div>
@@ -420,7 +409,7 @@ const Profile = () => {
                 onValueChange={(value) =>
                   handleToggleSetting("dailyReminderEnabled", value)
                 }
-                color="secondary"
+                color="primary"
                 size="md"
               />
             </div>
@@ -428,14 +417,14 @@ const Profile = () => {
             {/* Cảnh báo ngân sách */}
             <div className="flex items-center justify-between p-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400">
+                <div className="p-2 rounded-[10px] bg-content2 text-default-600">
                   <Wallet size={20} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-white">
+                  <p className="font-medium text-foreground">
                     Cảnh báo ngân sách
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-default-600">
                     Báo khi chi tiêu vượt ngưỡng cảnh báo của ngân sách
                   </p>
                 </div>
@@ -446,7 +435,7 @@ const Profile = () => {
                 onValueChange={(value) =>
                   handleToggleSetting("budgetWarningEnabled", value)
                 }
-                color="secondary"
+                color="primary"
                 size="md"
               />
             </div>
@@ -454,14 +443,14 @@ const Profile = () => {
             {/* Nhắc nợ đến hạn */}
             <div className="flex items-center justify-between p-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                <div className="p-2 rounded-[10px] bg-content2 text-default-600">
                   <Landmark size={20} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-white">
+                  <p className="font-medium text-foreground">
                     Nhắc nợ đến hạn
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-default-600">
                     Báo khi khoản nợ/cho vay sắp hoặc đã đến hạn
                   </p>
                 </div>
@@ -472,22 +461,22 @@ const Profile = () => {
                 onValueChange={(value) =>
                   handleToggleSetting("debtReminderEnabled", value)
                 }
-                color="secondary"
+                color="primary"
                 size="md"
               />
             </div>
 
             {/* Data Tools */}
-            <div className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+            <div className="flex items-center justify-between p-6 hover:bg-content2 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
+                <div className="p-2 rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
                   <Database size={20} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-white">
+                  <p className="font-medium text-foreground">
                     Dữ liệu & Công cụ
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-default-600">
                     Sao lưu, phục hồi và nhập liệu nâng cao
                   </p>
                 </div>

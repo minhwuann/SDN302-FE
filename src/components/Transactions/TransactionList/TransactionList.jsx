@@ -35,17 +35,22 @@ const TransactionList = ({ transactions, onEdit, onDelete }) => {
     <div className="space-y-3 sm:space-y-4">
       {/* Toolbar với tiêu đề và toggle view */}
       <div className="flex justify-between items-center gap-2">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-          Lịch Sử Giao Dịch
+        <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+          Lịch sử giao dịch
         </h2>
         {showToggle && (
           <Tabs
             selectedKey={viewMode}
             onSelectionChange={(key) => setViewMode(key)}
             size="sm"
-            variant="bordered"
+            variant="solid"
+            radius="lg"
+            aria-label="Chế độ hiển thị giao dịch"
             classNames={{
-              tabList: "gap-2",
+              tabList: "bg-content2 p-1 rounded-[10px]",
+              cursor: "bg-content1 shadow-sm rounded-lg",
+              tabContent:
+                "group-data-[selected=true]:text-primary group-data-[selected=true]:font-semibold text-default-600",
             }}
           >
             <Tab

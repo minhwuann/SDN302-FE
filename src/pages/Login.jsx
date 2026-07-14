@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Button, Input, Tabs, Tab, Divider } from "@heroui/react";
 import {
-  Card,
-  CardBody,
-  Button,
-  Input,
-  Tabs,
-  Tab,
-  Divider,
-} from "@heroui/react";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  ShieldCheck,
+  Sparkles,
+  LineChart,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as authApi from "../services/authApi";
 import {
@@ -285,28 +286,87 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-8 relative">
-      <div className="absolute top-4 right-4">
-        <ThemeButton />
-      </div>
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-2">
+      {/* Cột trái: panel thương hiệu/lợi ích (chỉ desktop) — phẳng, không gradient */}
+      <aside className="hidden lg:flex flex-col justify-between border-r border-divider bg-content1 p-10">
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 rounded-[10px] w-fit"
+        >
+          <img
+            src="/logoApp.png"
+            alt="Ví Vi Vu"
+            className="h-10 w-10 object-contain"
+          />
+          <span className="text-lg font-bold tracking-tight text-foreground">
+            Ví Vi Vu
+          </span>
+        </Link>
 
-      <Card className="w-full max-w-md shadow-lg">
-        <CardBody className="p-6 sm:p-8 space-y-6">
-          {/* Logo */}
-          <div className="text-center space-y-3">
-            <div className="flex justify-center">
-              <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-full">
-                <img src="/logoApp.png" alt="Ví Vi Vu Logo" className="w-12 h-12" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Ví Vi Vu
-              </h1>
-              <p className="text-sm text-primary-600 dark:text-primary-400">
-                Sống vi vu, không lo túi
-              </p>
-            </div>
+        <div className="max-w-sm">
+          <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground">
+            Sổ thu chi thông minh, gọn gàng và đáng tin cậy.
+          </h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-default-600">
+            Sống vi vu, không lo túi. Quản lý thu chi hằng ngày với sự hỗ trợ của
+            AI.
+          </p>
+
+          <ul className="mt-8 space-y-4">
+            {[
+              {
+                icon: LineChart,
+                title: "Thống kê rõ ràng",
+                desc: "Biểu đồ thu chi trực quan, dễ hiểu.",
+              },
+              {
+                icon: Sparkles,
+                title: "Trợ lý AI",
+                desc: "Nhập giao dịch bằng ngôn ngữ tự nhiên.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Riêng tư & an toàn",
+                desc: "Dữ liệu được mã hóa, thuộc về bạn.",
+              },
+            ].map((f) => {
+              const Icon = f.icon;
+              return (
+                <li key={f.title} className="flex gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-primary-50 text-primary dark:bg-primary-500/15">
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {f.title}
+                    </p>
+                    <p className="text-sm text-default-600">{f.desc}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <p className="text-xs text-default-500">© Ví Vi Vu</p>
+      </aside>
+
+      {/* Cột phải: biểu mẫu xác thực */}
+      <main className="relative flex min-h-screen items-center justify-center px-4 py-10 lg:min-h-0">
+        <div className="absolute top-4 right-4">
+          <ThemeButton />
+        </div>
+
+        <div className="w-full max-w-md space-y-6">
+          {/* Logo (nổi bật trên mobile, gọn trên desktop) */}
+          <div className="space-y-2 text-center lg:hidden">
+            <img
+              src="/logoApp.png"
+              alt="Ví Vi Vu Logo"
+              className="mx-auto h-12 w-12"
+            />
+            <h1 className="text-xl font-bold text-foreground">Ví Vi Vu</h1>
+            <p className="text-sm text-default-600">Sống vi vu, không lo túi</p>
           </div>
 
           {authMode === "otp" ? (
@@ -681,16 +741,16 @@ const Login = () => {
 
           <p className="text-xs text-center text-gray-500 dark:text-gray-400">
             Bằng cách đăng nhập, bạn đồng ý với{" "}
-            <Link to="/terms-of-service" className="text-primary-500 hover:underline">
+            <Link to="/terms-of-service" className="text-primary hover:underline">
               Điều khoản sử dụng
             </Link>{" "}
             và{" "}
-            <Link to="/privacy-policy" className="text-primary-500 hover:underline">
+            <Link to="/privacy-policy" className="text-primary hover:underline">
               Chính sách bảo mật
             </Link>
           </p>
-        </CardBody>
-      </Card>
+        </div>
+      </main>
     </div>
   );
 };
