@@ -7,7 +7,12 @@
  */
 
 import apiClient from "./apiClient";
-import { setTokens, clearTokens, setCachedUser } from "./tokenStore";
+import {
+  setTokens,
+  clearTokens,
+  setCachedUser,
+  getRefreshToken,
+} from "./tokenStore";
 
 /**
  * Chuẩn hoá user của BE về shape tương thích với code FE cũ (vốn dùng Firebase).
@@ -138,10 +143,15 @@ export const revokeSession = (sessionId) =>
 export const revokeAllSessions = () =>
   apiClient.post("/me/sessions/revoke-all");
 
-/** Đăng xuất: thu hồi refresh token ở BE (đọc từ cookie httpOnly) rồi xoá local. */
+/** Đăng xuất: gửi refresh token trong body để BE thu hồi đúng phiên rồi xoá local. */
 export const logout = async () => {
   try {
-    await apiClient.post("/auth/logout", undefined, { auth: false });
+    const refreshToken = getRefreshToken();
+    await apiClient.post(
+      "/auth/logout",
+      refreshToken ? { refreshToken } : undefined,
+      { auth: false }
+    );
   } catch {
     // Bỏ qua lỗi mạng khi logout - vẫn xoá phiên local
   } finally {

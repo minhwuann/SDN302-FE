@@ -9,7 +9,12 @@
  *    để AuthContext điều hướng về trang đăng nhập.
  */
 
-import { getAccessToken, setTokens, clearTokens } from "./tokenStore";
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+} from "./tokenStore";
 
 /**
  * Chuẩn hoá base URL để tránh các lỗi cấu hình phổ biến:
@@ -58,6 +63,19 @@ function buildQuery(query) {
   return qs ? `?${qs}` : "";
 }
 
+/**
+ * Backend free-tier (Railway/Render) có thể "ngủ" và trả 502/503/504 hoặc
+ * timeout ở request đầu (cold start). Thử lại vài lần với backoff giúp lần
+ * đăng nhập / gọi API đầu tiên không bị fail oan.
+ * Chỉ retry khi máy chủ CHƯA xử lý request (gateway error / lỗi mạng), nên
+ * an toàn kể cả với POST (không tạo trùng dữ liệu).
+ */
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+const MAX_GATEWAY_RETRIES = 3;
+const RETRY_BACKOFF_MS = [1000, 2500, 5000];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function parseResponse(response) {
   // 204 No Content hoặc body rỗng
   const text = await response.text();
@@ -73,7 +91,8 @@ let refreshPromise = null;
 
 /**
  * Gọi BE để xoay vòng access token bằng refresh token.
- * Refresh token nằm trong cookie httpOnly (BE tự đọc/set), không còn ở JS.
+ * BE nhận refresh token trong JSON body (không dùng cookie) và trả về refresh
+ * token MỚI -> lưu lại cả access + refresh mới qua setTokens.
  * Dùng chung 1 promise để tránh gọi refresh nhiều lần song song.
  */
 async function refreshAccessToken() {
@@ -81,9 +100,15 @@ async function refreshAccessToken() {
 
   refreshPromise = (async () => {
     try {
+      const refreshToken = getRefreshToken();
+      // Không có refresh token -> không thể làm mới phiên.
+      if (!refreshToken) return null;
+
       const response = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ refreshToken }),
       });
       const payload = await parseResponse(response);
       if (!response.ok || payload.error) {
@@ -91,7 +116,7 @@ async function refreshAccessToken() {
       }
       const tokens = payload.data?.tokens;
       if (tokens) {
-        setTokens(tokens);
+        setTokens(tokens); // lưu access + refresh token đã xoay vòng
         return tokens.accessToken;
       }
       return null;
@@ -129,7 +154,7 @@ async function request(method, path, options = {}, _retry = false) {
     if (token) finalHeaders.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${path}${buildQuery(query)}`, {
+  const fetchOptions = {
     method,
     headers: finalHeaders,
     credentials: "include",
@@ -139,7 +164,35 @@ async function request(method, path, options = {}, _retry = false) {
         : body instanceof FormData
         ? body
         : JSON.stringify(body),
-  });
+  };
+  const url = `${BASE_URL}${path}${buildQuery(query)}`;
+
+  // Gọi kèm cơ chế thử lại khi backend cold-start (gateway error / lỗi mạng).
+  let response;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      response = await fetch(url, fetchOptions);
+    } catch {
+      // Lỗi mạng (server chưa phản hồi) -> retry nếu còn lượt.
+      if (attempt < MAX_GATEWAY_RETRIES) {
+        await sleep(RETRY_BACKOFF_MS[attempt] || 5000);
+        continue;
+      }
+      throw new ApiError({
+        status: 0,
+        code: "NETWORK_ERROR",
+        message:
+          "Không kết nối được máy chủ. Máy chủ có thể đang khởi động, vui lòng thử lại sau giây lát.",
+      });
+    }
+
+    // 502/503/504 = gateway chưa lấy được phản hồi từ app (thường do cold start).
+    if (GATEWAY_STATUSES.has(response.status) && attempt < MAX_GATEWAY_RETRIES) {
+      await sleep(RETRY_BACKOFF_MS[attempt] || 5000);
+      continue;
+    }
+    break;
+  }
 
   // Tải file (export) -> trả Response thô
   if (raw) {
