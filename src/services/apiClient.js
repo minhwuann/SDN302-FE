@@ -19,7 +19,7 @@ import {
 /**
  * Chuẩn hoá base URL để tránh các lỗi cấu hình phổ biến:
  *  - Bỏ dấu "/" thừa ở cuối (tránh "//auth/...").
- *  - Tự thêm prefix "/api/v1" nếu URL chưa có (vd chỉ ghi domain Railway).
+ *  - Tự thêm prefix "/api/v1" nếu URL chưa có (vd chỉ ghi domain Render).
  */
 function normalizeBaseUrl(raw) {
   let url = (raw || "http://localhost:3000/api/v1").trim().replace(/\/+$/, "");
@@ -64,7 +64,7 @@ function buildQuery(query) {
 }
 
 /**
- * Backend free-tier (Railway/Render) có thể "ngủ" và trả 502/503/504 hoặc
+ * Backend free-tier (Render) có thể "ngủ" và trả 502/503/504 hoặc
  * timeout ở request đầu (cold start). Thử lại vài lần với backoff giúp lần
  * đăng nhập / gọi API đầu tiên không bị fail oan.
  * Chỉ retry khi máy chủ CHƯA xử lý request (gateway error / lỗi mạng), nên
