@@ -29,31 +29,37 @@ import { formatCurrency } from "../../utils/formatCurrency";
 const StatCard = ({
   title,
   value,
-  // eslint-disable-next-line no-unused-vars
-  icon: IconComponent,
-  gradient,
+  icon: Icon,
   trend,
   trendValue,
+  textColor = "text-gray-900 dark:text-white",
+  iconColor = "text-gray-500",
 }) => (
-  <Card className={`${gradient} text-white shadow-lg border-none`}>
+  <Card className="bg-white/80 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-800 shadow-sm backdrop-blur-md">
     <CardBody className="p-5">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            {title}
+          </p>
+          {Icon && <Icon className={`w-4 h-4 ${iconColor}`} strokeWidth={2.5} />}
+        </div>
         <div>
-          <p className="text-sm opacity-90 mb-1">{title}</p>
-          <p className="text-2xl font-bold tracking-tight">{value}</p>
+          <p className={`text-3xl font-bold ${textColor}`}>
+            {value}
+          </p>
           {trend && (
-            <div className="flex items-center gap-1 mt-2 text-xs opacity-90">
+            <div className="flex items-center gap-1 mt-1 text-xs font-medium">
               {trend === "up" ? (
-                <ArrowUpRight className="w-3 h-3" />
+                <ArrowUpRight className="w-3 h-3 text-emerald-500" />
               ) : (
-                <ArrowDownRight className="w-3 h-3" />
+                <ArrowDownRight className="w-3 h-3 text-rose-500" />
               )}
-              <span>{trendValue}</span>
+              <span className={trend === "up" ? "text-emerald-500" : "text-rose-500"}>
+                {trendValue}
+              </span>
             </div>
           )}
-        </div>
-        <div className="p-3 bg-white/20 rounded-xl">
-          <IconComponent className="w-6 h-6" />
         </div>
       </div>
     </CardBody>
@@ -110,7 +116,7 @@ function Statistics() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 dark:text-white flex items-center gap-3 tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3 tracking-tight">
             <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-xl">
               <BarChart3 className="w-6 h-6 text-primary-500" />
             </div>
@@ -141,29 +147,29 @@ function Statistics() {
           title="Tổng thu nhập"
           value={formatCurrency(stats.income)}
           icon={TrendingUp}
-          gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          textColor="text-emerald-600 dark:text-emerald-400"
+          iconColor="text-emerald-500"
         />
         <StatCard
           title="Tổng chi tiêu"
           value={formatCurrency(stats.expense)}
           icon={TrendingDown}
-          gradient="bg-gradient-to-br from-rose-500 to-rose-600"
+          textColor="text-rose-600 dark:text-rose-400"
+          iconColor="text-rose-500"
         />
         <StatCard
           title="Chênh lệch"
           value={formatCurrency(stats.balance)}
           icon={Wallet}
-          gradient={
-            stats.balance >= 0
-              ? "bg-gradient-to-br from-blue-500 to-blue-600"
-              : "bg-gradient-to-br from-orange-500 to-orange-600"
-          }
+          textColor={stats.balance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}
+          iconColor={stats.balance >= 0 ? "text-blue-500" : "text-orange-500"}
         />
         <StatCard
           title="Số giao dịch"
           value={stats.transactionCount.toLocaleString("vi-VN")}
           icon={Receipt}
-          gradient="bg-gradient-to-br from-purple-500 to-purple-600"
+          textColor="text-purple-600 dark:text-purple-400"
+          iconColor="text-purple-500"
         />
       </div>
 

@@ -203,7 +203,7 @@ const GoalCard = ({ goal, onAddMoney, onEdit, onDelete }) => {
 
           {isCompleted && (
             <div className="text-center py-2 text-green-500 font-medium">
-              🎉 Chúc mừng! Đã đạt mục tiêu!
+              Chúc mừng! Đã đạt mục tiêu!
             </div>
           )}
         </CardBody>

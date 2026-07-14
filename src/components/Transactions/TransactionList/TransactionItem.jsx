@@ -50,7 +50,7 @@ const TransactionItem = ({ transaction, onEdit, onDelete }) => {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Emoji Icon với background color từ category */}
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
             style={{ backgroundColor: `${categoryColor}20` }}
           >
             {categoryEmoji}

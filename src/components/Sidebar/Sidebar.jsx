@@ -75,10 +75,10 @@ const Sidebar = () => {
                 to={item.path}
                 end={item.path === "/"}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
                     isActive
-                      ? "bg-primary-500 text-white font-medium shadow-md"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 font-bold"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                   }`
                 }
               >
@@ -100,7 +100,7 @@ const Sidebar = () => {
       </aside>
 
       {/* Mobile Top Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-50 px-4 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-50 px-4 flex items-center justify-between">
         <Link
           to="/"
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
@@ -123,7 +123,7 @@ const Sidebar = () => {
       </header>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 pb-safe shadow-lg">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 pb-safe shadow-lg">
         <div className="grid grid-cols-5 h-16 pb-safe">
           {/* Menu Items */}
           {MENU_ITEMS.map((item) => {
@@ -134,19 +134,19 @@ const Sidebar = () => {
                 to={item.path}
                 end={item.path === "/"}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center h-full transition-all duration-300 relative group ${
+                  `flex flex-col items-center justify-center h-full transition-colors duration-200 relative group ${
                     isActive
-                      ? "text-primary-600 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
                     <div
-                      className={`p-1.5 rounded-xl transition-all duration-300 ${
+                      className={`p-1.5 rounded-xl transition-colors duration-200 ${
                         isActive
-                          ? "bg-primary-500 text-white transform -translate-y-1 shadow-md"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                           : "group-hover:bg-gray-100 dark:group-hover:bg-gray-800"
                       }`}
                     >

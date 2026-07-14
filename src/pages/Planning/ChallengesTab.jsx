@@ -19,7 +19,6 @@ import {
 import { Plus, Trophy, Flame, Target, Trash2, Calendar } from "lucide-react";
 import { useChallenges } from "../../contexts/ChallengesContext";
 import { format, differenceInDays, parseISO } from "date-fns";
-import { vi } from "date-fns/locale";
 
 /**
  * Template thử thách phổ biến
@@ -68,12 +67,10 @@ const ChallengesTab = () => {
     loading,
     stats,
     addChallenge,
-    editChallenge,
     removeChallenge,
   } = useChallenges();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customForm, setCustomForm] = useState({
     title: "",
     description: "",
@@ -277,7 +274,7 @@ const ChallengesTab = () => {
       {completedChallenges.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-default-900">
-            Đã hoàn thành 🎉
+            Đã hoàn thành
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {completedChallenges.map((challenge) => (

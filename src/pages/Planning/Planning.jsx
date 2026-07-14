@@ -32,7 +32,7 @@ const Planning = () => {
     <div className="space-y-6 pb-24 md:pb-6">
       <div className="flex justify-between items-start">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">
             Kế Hoạch Tài Chính
           </h1>
           <p className="text-slate-500">
@@ -56,76 +56,36 @@ const Planning = () => {
             cursor: "w-full bg-primary",
             tab: "max-w-fit px-0 h-12",
             tabContent:
-              "group-data-[selected=true]:text-primary font-medium text-base md:text-lg",
+              "group-data-[selected=true]:text-primary text-slate-700 dark:text-slate-300 font-medium text-base md:text-lg",
           }}
         >
-          <Tab
-            key="budget"
-            title={
-              <div className="flex items-center space-x-2">
-                <PiggyBank size={20} />
-                <span>Ngân Sách</span>
-              </div>
-            }
-          >
+          <Tab key="budget" title="Ngân Sách">
             <div className="pt-4">
               <BudgetTab />
             </div>
           </Tab>
-          <Tab
-            key="goals"
-            title={
-              <div className="flex items-center space-x-2">
-                <Target size={20} />
-                <span>Tiết Kiệm</span>
-              </div>
-            }
-          >
+          <Tab key="goals" title="Tiết Kiệm">
             <div className="pt-4">
               <Suspense fallback={<Spinner size="lg" label="Đang tải..." />}>
                 <GoalsTab />
               </Suspense>
             </div>
           </Tab>
-          <Tab
-            key="debts"
-            title={
-              <div className="flex items-center space-x-2">
-                <HandCoins size={20} />
-                <span>Món Nợ</span>
-              </div>
-            }
-          >
+          <Tab key="debts" title="Món Nợ">
             <div className="pt-4">
               <Suspense fallback={<Spinner size="lg" label="Đang tải..." />}>
                 <DebtsTab />
               </Suspense>
             </div>
           </Tab>
-          <Tab
-            key="challenges"
-            title={
-              <div className="flex items-center space-x-2">
-                <Trophy size={20} />
-                <span>Thử Thách</span>
-              </div>
-            }
-          >
+          <Tab key="challenges" title="Thử Thách">
             <div className="pt-4">
               <Suspense fallback={<Spinner size="lg" label="Đang tải..." />}>
                 <ChallengesTab />
               </Suspense>
             </div>
           </Tab>
-          <Tab
-            key="shopping"
-            title={
-              <div className="flex items-center space-x-2">
-                <ClipboardList size={20} />
-                <span>Mua Sắm</span>
-              </div>
-            }
-          >
+          <Tab key="shopping" title="Mua Sắm">
             <div className="pt-4">
               <ShoppingListTab />
             </div>

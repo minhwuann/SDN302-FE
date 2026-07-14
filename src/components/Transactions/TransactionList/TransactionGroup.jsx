@@ -8,22 +8,22 @@ import { formatDateHeader } from "./useTransactionList";
  */
 const TransactionGroup = ({ date, transactions, onEdit, onDelete }) => {
   return (
-    <div className="mb-6">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 px-2">
-        {formatDateHeader(date)}
-      </h3>
-      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
-        <CardBody className="p-0">
-          {transactions.map((transaction) => (
-            <TransactionItem
-              key={transaction.id}
-              transaction={transaction}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-        </CardBody>
-      </Card>
+    <div className="border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+      <div className="px-4 py-3 bg-gray-50/50 dark:bg-gray-800/50">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          {formatDateHeader(date)}
+        </h3>
+      </div>
+      <div className="flex flex-col">
+        {transactions.map((transaction) => (
+          <TransactionItem
+            key={transaction.id}
+            transaction={transaction}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
     </div>
   );
 };

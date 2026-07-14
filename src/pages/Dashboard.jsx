@@ -12,6 +12,8 @@ import {
 import StatsCards from "../components/StatsCard";
 import TransactionList from "../components/Transactions/TransactionList/TransactionList";
 import CalendarView from "../components/Calendar/CalendarView";
+import { AnimatedList } from "../components/magicui/AnimatedList";
+import { TransactionNotification } from "../components/magicui/TransactionNotification";
 import RefreshButton from "../components/RefreshButton";
 import ThemeButton from "../components/ThemeButton";
 import { useTransactionsContext } from "../contexts/TransactionsContext";
@@ -86,21 +88,20 @@ function Dashboard() {
           <div>
             {/* Greeting */}
             <div className="flex items-center gap-2 mb-1">
-              <GreetingIcon className={`w-5 h-5 ${greeting.color}`} />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {greeting.text}!
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                {greeting.text}
               </span>
             </div>
             {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">
               Tổng Quan
             </h1>
             {/* Date */}
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               {format(new Date(), "EEEE, dd MMMM yyyy", { locale: vi })}
             </p>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeButton />
             <RefreshButton />
           </div>
@@ -112,18 +113,17 @@ function Dashboard() {
             variant="flat"
             color="default"
             size="sm"
-            startContent={<TrendingDown className="w-3 h-3" />}
+            className="text-gray-600 dark:text-gray-300 font-medium"
           >
             {monthStats.transactionCount} giao dịch tháng này
           </Chip>
           <Chip
             variant="flat"
-            color="warning"
+            color="primary"
             size="sm"
-            startContent={<TrendingUp className="w-3 h-3" />}
+            className="font-medium"
           >
-            ~{new Intl.NumberFormat("vi-VN").format(monthStats.avgDaily)}{" "}
-            VND/ngày
+            Trung bình {new Intl.NumberFormat("vi-VN").format(monthStats.avgDaily)} VND/ngày
           </Chip>
         </div>
       </div>
@@ -134,6 +134,27 @@ function Dashboard() {
         totalExpense={totalExpense}
         balance={balance}
       />
+
+      {/* Hoạt động gần đây (Animated List) */}
+      <div className="mt-4 sm:mt-8">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Hoạt động gần đây</h2>
+        <div className="relative flex h-[350px] w-full flex-col overflow-hidden bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-4">
+          <AnimatedList>
+            {transactions.slice(0, 8).map((t) => (
+              <TransactionNotification
+                key={t.id}
+                name={t.category?.name || "Giao dịch"}
+                description={t.note || "Giao dịch qua Ví Vi Vu"}
+                time={format(new Date(t.date), "dd/MM", { locale: vi })}
+                icon={t.category?.icon || "💸"}
+                color={t.type === "INCOME" ? "#00C9A7" : "#FF3D71"}
+                amount={`${t.type === "INCOME" ? "+" : "-"}${new Intl.NumberFormat("vi-VN").format(t.amount)}đ`}
+              />
+            ))}
+          </AnimatedList>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900"></div>
+        </div>
+      </div>
 
       {/* Tabs: Danh sách / Lịch */}
       <div className="mt-4 sm:mt-8">

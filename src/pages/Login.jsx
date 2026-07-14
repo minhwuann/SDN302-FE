@@ -17,6 +17,7 @@ import {
   isGoogleConfigured,
 } from "../services/googleAuth";
 import ThemeButton from "../components/ThemeButton";
+import VantaBackground from "../components/VantaBackground";
 
 /**
  * Trang đăng nhập - dùng Backend Ví Vi Vu (JWT + OTP email + Google GIS).
@@ -45,8 +46,15 @@ const ERROR_MESSAGES = {
 
 const Login = () => {
   const navigate = useNavigate();
-  const { loginWithEmail, loginWithGoogle, register, verifyOtp, resendOtp } =
+  const { loginWithEmail, loginWithGoogle, register, verifyOtp, resendOtp, currentUser } =
     useAuth();
+
+  // Tự động chuyển hướng nếu đã đăng nhập (phòng trường hợp React unmount component)
+  useEffect(() => {
+    if (currentUser) {
+      navigate("/", { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -285,12 +293,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-8 relative">
-      <div className="absolute top-4 right-4">
+    <VantaBackground>
+      <div className="absolute top-4 right-4 z-50">
         <ThemeButton />
       </div>
 
-      <Card className="w-full max-w-md shadow-lg">
+      <Card className="w-full max-w-md shadow-2xl bg-white/80 dark:bg-gray-900/70 backdrop-blur-lg border border-white/20 dark:border-gray-800/50">
         <CardBody className="p-6 sm:p-8 space-y-6">
           {/* Logo */}
           <div className="text-center space-y-3">
@@ -691,7 +699,7 @@ const Login = () => {
           </p>
         </CardBody>
       </Card>
-    </div>
+    </VantaBackground>
   );
 };
 

@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
 /* Ẩn icon mắt mặc định của trình duyệt (Edge/Chrome) cho input password */
 input::-ms-reveal,
 input::-ms-clear,

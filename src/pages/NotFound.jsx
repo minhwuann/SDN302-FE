@@ -1,11 +1,12 @@
 import { Button } from "@heroui/react";
 import { Home, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
+import VantaBackground from "../components/VantaBackground";
 
 const NotFound = () => {
   return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="text-center">
+    <VantaBackground>
+      <div className="text-center bg-white/80 dark:bg-gray-900/70 backdrop-blur-xl shadow-2xl border border-white/20 dark:border-gray-800/50 p-12 rounded-3xl">
         <AlertTriangle className="w-24 h-24 text-warning mx-auto mb-6" />
         <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4">
           404
@@ -26,7 +27,7 @@ const NotFound = () => {
           Trở về Trang chủ
         </Button>
       </div>
-    </div>
+    </VantaBackground>
   );
 };
 

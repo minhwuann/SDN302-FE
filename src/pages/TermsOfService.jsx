@@ -74,7 +74,7 @@ const TermsOfService = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-pink-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <div className="min-h-screen bg-[#fef3c7] dark:bg-gray-950">
       {/* Hero Header */}
       <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white">
         <div className="max-w-4xl mx-auto px-6 py-12">

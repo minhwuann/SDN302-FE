@@ -14,7 +14,7 @@ const FloatingActionButton = ({ onOpenAddTransaction, onOpenChat }) => {
   const toggleOpen = () => setIsOpen(!isOpen);
 
   return (
-    <div className="fixed bottom-28 sm:bottom-32 lg:bottom-6 right-4 sm:right-6 z-40 flex flex-col items-center gap-3">
+    <div className="fixed bottom-8 right-8 z-40 flex flex-col items-center gap-3">
       <AnimatePresence>
         {isOpen && (
           <>
@@ -28,7 +28,7 @@ const FloatingActionButton = ({ onOpenAddTransaction, onOpenChat }) => {
             >
               <Button
                 isIconOnly
-                className="shadow-lg backdrop-blur-md bg-transparent dark:bg-white/10 text-purple-600 dark:text-purple-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20"
+                className="w-12 h-12 shadow-lg bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full"
                 onPress={() => {
                   onOpenChat();
                   setIsOpen(false);
@@ -49,7 +49,7 @@ const FloatingActionButton = ({ onOpenAddTransaction, onOpenChat }) => {
             >
               <Button
                 isIconOnly
-                className="shadow-lg backdrop-blur-md bg-transparent dark:bg-white/10 text-blue-600 dark:text-blue-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20"
+                className="w-12 h-12 shadow-lg bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full"
                 onPress={() => {
                   onOpenAddTransaction();
                   setIsOpen(false);
@@ -66,8 +66,7 @@ const FloatingActionButton = ({ onOpenAddTransaction, onOpenChat }) => {
       {/* Main Toggle Button */}
       <Button
         isIconOnly
-        size="lg"
-        className={`shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-md bg-transparent dark:bg-white/10 text-blue-600 dark:text-blue-400 border-2 border-blue-500 dark:border-white/20 hover:bg-blue-50 dark:hover:bg-white/20 ${
+        className={`w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all flex items-center justify-center ${
           isOpen ? "rotate-180" : ""
         }`}
         onPress={toggleOpen}

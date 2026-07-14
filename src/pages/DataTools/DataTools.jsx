@@ -105,7 +105,7 @@ function DataTools() {
           cursor: "w-full bg-primary",
           tab: "min-w-fit px-0 h-12",
           tabContent:
-            "group-data-[selected=true]:text-primary font-medium text-sm sm:text-base",
+            "group-data-[selected=true]:text-primary text-slate-700 dark:text-slate-300 font-medium text-sm sm:text-base",
         }}
       >
         {/* Tab 1: Paste từ Excel */}

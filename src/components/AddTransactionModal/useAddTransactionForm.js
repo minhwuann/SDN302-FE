@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { formatAmountInput, parseAmountInput } from "../../utils/formatCurrency";
+import { parseAmountInput } from "../../utils/formatCurrency";
 
 /**
  * Hook xử lý logic cho form thêm/sửa giao dịch
