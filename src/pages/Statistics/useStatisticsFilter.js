@@ -1,32 +1,18 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { filterTransactionsByDateRange } from "../../utils/dateFilter";
 
 /**
- * Hook xử lý logic lọc dữ liệu cho trang Statistics
- * Quản lý dateRange state và tính toán filteredTransactions
- * 
- * @param {Array} transactions - Mảng tất cả các giao dịch
- * @returns {Object} Object chứa state và dữ liệu đã được lọc
+ * Hook quản lý state dateRange cho trang Statistics.
+ * Các số liệu/chart giờ lấy trực tiếp từ BE (/analytics/*) theo dateRange này,
+ * hook không còn tự lọc transactions ở client.
+ *
+ * @returns {Object} Object chứa state dateRange
  * @returns {Object|null} returns.dateRange - Khoảng thời gian đã chọn { from: Date, to: Date }
  * @returns {Function} returns.setDateRange - Hàm set state cho dateRange
- * @returns {Array} returns.filteredTransactions - Mảng transactions đã được lọc theo dateRange
  * @returns {string} returns.dateRangeText - Text tóm tắt khoảng thời gian đang xem
  */
-export const useStatisticsFilter = (transactions) => {
+export const useStatisticsFilter = () => {
   const [dateRange, setDateRange] = useState(null);
-
-  /**
-   * Lọc transactions theo khoảng thời gian đã chọn
-   * Nếu không có dateRange, trả về toàn bộ transactions
-   */
-  const filteredTransactions = useMemo(() => {
-    if (!dateRange) {
-      // Mặc định là tất cả transactions nếu chưa có dateRange
-      return transactions;
-    }
-    return filterTransactionsByDateRange(transactions, dateRange);
-  }, [transactions, dateRange]);
 
   /**
    * Format text tóm tắt khoảng thời gian
@@ -45,7 +31,6 @@ export const useStatisticsFilter = (transactions) => {
   return {
     dateRange,
     setDateRange,
-    filteredTransactions,
     dateRangeText,
   };
 };

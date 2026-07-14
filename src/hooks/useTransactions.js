@@ -242,6 +242,13 @@ const useTransactions = () => {
     }
   }, [reloadTransactions]);
 
+  /** Tải lại danh sách tài khoản thanh toán (sau khi thêm/sửa/xoá). */
+  const refreshPaymentAccounts = useCallback(async () => {
+    const accounts = await paymentAccountApi.listPaymentAccounts();
+    setPaymentAccounts(accounts);
+    return accounts;
+  }, []);
+
   /* -------------------------------- Ledgers -------------------------------- */
 
   const switchLedger = useCallback((ledger) => {
@@ -321,6 +328,7 @@ const useTransactions = () => {
     totalExpense,
     balance,
     paymentAccounts,
+    refreshPaymentAccounts,
     // Ledger
     ledgers,
     currentLedger,

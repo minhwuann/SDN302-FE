@@ -11,6 +11,7 @@ import {
 } from "@heroui/react";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import * as authApi from "../services/authApi";
 import {
   renderGoogleButton,
   isGoogleConfigured,
@@ -20,10 +21,11 @@ import ThemeButton from "../components/ThemeButton";
 /**
  * Trang đăng nhập - dùng Backend Ví Vi Vu (JWT + OTP email + Google GIS).
  *
- * Ba chế độ:
+ * Bốn chế độ:
  *  - login: đăng nhập email/mật khẩu
  *  - register: đăng ký -> BE gửi OTP qua email
  *  - otp: nhập mã OTP để hoàn tất đăng ký & tạo phiên
+ *  - forgot: quên mật khẩu (bước con forgotStep: email -> reset)
  */
 
 // Map mã lỗi BE -> thông báo tiếng Việt thân thiện
@@ -50,12 +52,15 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  const [authMode, setAuthMode] = useState("login"); // login | register | otp
+  const [authMode, setAuthMode] = useState("login"); // login | register | otp | forgot
+  const [forgotStep, setForgotStep] = useState("email"); // email | reset
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [otpCode, setOtpCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const googleBtnRef = useRef(null);
@@ -70,7 +75,7 @@ const Login = () => {
 
   // Render nút Google GIS
   useEffect(() => {
-    if (authMode === "otp") return;
+    if (authMode === "otp" || authMode === "forgot") return;
     if (!googleBtnRef.current) return;
     renderGoogleButton(
       googleBtnRef.current,
@@ -204,6 +209,81 @@ const Login = () => {
     setSuccessMessage(null);
   };
 
+  /** Mở luồng quên mật khẩu từ tab đăng nhập */
+  const openForgotPassword = () => {
+    setAuthMode("forgot");
+    setForgotStep("email");
+    setOtpCode("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  const backToLoginFromForgot = () => {
+    setAuthMode("login");
+    setForgotStep("email");
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  /** Bước 1 quên mật khẩu: yêu cầu gửi OTP đặt lại mật khẩu */
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+    if (!email) {
+      setError("Vui lòng nhập email");
+      return;
+    }
+    try {
+      setIsLoading(true);
+      setError(null);
+      await authApi.forgotPassword(email);
+      setSuccessMessage(`Nếu email này đã đăng ký, mã OTP đã được gửi tới ${email}.`);
+      setForgotStep("reset");
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /** Bước 2 quên mật khẩu: xác thực OTP + đặt mật khẩu mới */
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      setError("Vui lòng nhập đủ 6 số OTP");
+      return;
+    }
+    if (!newPassword || !confirmNewPassword) {
+      setError("Vui lòng nhập đầy đủ mật khẩu mới");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError("Mật khẩu phải có ít nhất 8 ký tự");
+      return;
+    }
+    try {
+      setIsLoading(true);
+      setError(null);
+      await authApi.resetPassword({ email, otpCode, newPassword });
+      setSuccessMessage("Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
+      setAuthMode("login");
+      setForgotStep("email");
+      setPassword("");
+      setOtpCode("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-8 relative">
       <div className="absolute top-4 right-4">
@@ -285,6 +365,139 @@ const Login = () => {
                 </button>
               </div>
             </div>
+          ) : authMode === "forgot" ? (
+            /* ------------------- Quên mật khẩu ------------------- */
+            <div className="space-y-5">
+              <button
+                type="button"
+                onClick={backToLoginFromForgot}
+                className="flex items-center gap-1 text-sm text-default-500 hover:text-default-700"
+              >
+                <ArrowLeft size={16} /> Quay lại đăng nhập
+              </button>
+
+              {forgotStep === "email" ? (
+                <>
+                  <div className="text-center space-y-1">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Quên mật khẩu
+                    </h2>
+                    <p className="text-sm text-default-500">
+                      Nhập email để nhận mã OTP đặt lại mật khẩu
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleForgotPasswordRequest} className="space-y-4">
+                    <Input
+                      type="email"
+                      label="Email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onValueChange={setEmail}
+                      startContent={<Mail size={18} className="text-default-400" />}
+                      isRequired
+                      autoFocus
+                    />
+                    <Button
+                      type="submit"
+                      color="primary"
+                      className="w-full"
+                      size="lg"
+                      isLoading={isLoading}
+                    >
+                      Gửi mã OTP
+                    </Button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div className="text-center space-y-1">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Đặt lại mật khẩu
+                    </h2>
+                    <p className="text-sm text-default-500">
+                      Nhập mã 6 số đã gửi tới <strong>{email}</strong> và mật khẩu mới
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleResetPassword} className="space-y-4">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      label="Mã OTP"
+                      placeholder="Nhập 6 số"
+                      value={otpCode}
+                      onValueChange={(v) =>
+                        setOtpCode(v.replace(/\D/g, "").slice(0, 6))
+                      }
+                      size="lg"
+                      classNames={{ input: "text-center tracking-[0.5em] text-lg" }}
+                      autoFocus
+                    />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      label="Mật khẩu mới"
+                      placeholder="Nhập mật khẩu mới"
+                      value={newPassword}
+                      onValueChange={setNewPassword}
+                      startContent={<Lock size={18} className="text-default-400" />}
+                      endContent={
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="focus:outline-none"
+                        >
+                          {showPassword ? (
+                            <EyeOff size={18} className="text-default-400" />
+                          ) : (
+                            <Eye size={18} className="text-default-400" />
+                          )}
+                        </button>
+                      }
+                      isRequired
+                    />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      label="Xác nhận mật khẩu mới"
+                      placeholder="Nhập lại mật khẩu mới"
+                      value={confirmNewPassword}
+                      onValueChange={setConfirmNewPassword}
+                      startContent={<Lock size={18} className="text-default-400" />}
+                      isRequired
+                      isInvalid={
+                        confirmNewPassword && confirmNewPassword !== newPassword
+                      }
+                      errorMessage={
+                        confirmNewPassword && confirmNewPassword !== newPassword
+                          ? "Mật khẩu không khớp"
+                          : ""
+                      }
+                    />
+                    <Button
+                      type="submit"
+                      color="primary"
+                      className="w-full"
+                      size="lg"
+                      isLoading={isLoading}
+                    >
+                      Đặt lại mật khẩu
+                    </Button>
+                  </form>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={handleForgotPasswordRequest}
+                      disabled={isLoading}
+                      className="text-sm text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                      Chưa nhận được mã? Gửi lại
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
             /* -------------------- Đăng nhập / Đăng ký -------------------- */
             <>
@@ -351,6 +564,18 @@ const Login = () => {
                   }
                   isRequired
                 />
+
+                {authMode === "login" && (
+                  <div className="flex justify-end -mt-2">
+                    <button
+                      type="button"
+                      onClick={openForgotPassword}
+                      className="text-xs text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  </div>
+                )}
 
                 {authMode === "register" && (
                   <Input

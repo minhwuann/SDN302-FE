@@ -1,4 +1,4 @@
-# 💰 Sổ Thu Chi AI - Personal Expense Tracker
+# 💰 Ví Vi Vu - Personal Expense Tracker
 
 Ứng dụng quản lý thu chi cá nhân thông minh với trợ lý AI tích hợp.
 
@@ -6,24 +6,26 @@
 
 👉 **[Ví Vi Vu](https://vivivu.vercel.app/)**
 
-> Đăng nhập bằng tài khoản Google để trải nghiệm đầy đủ tính năng.
+> Đăng ký bằng email hoặc đăng nhập nhanh bằng Google để trải nghiệm đầy đủ tính năng.
 
 ---
 
 ## ✨ Tính năng
 
 | Tính năng              | Mô tả                                               |
-| ---------------------- | --------------------------------------------------- |
-| 📊 **Quản lý Thu Chi** | Phân loại danh mục 2 cấp, tuỳ chỉnh emoji & màu sắc |
-| 🤖 **Trợ lý AI**       | Thêm giao dịch bằng ngôn ngữ tự nhiên (Gemini)      |
-| 📅 **Lịch Chi Tiêu**   | Xem giao dịch theo dạng calendar                    |
-| 📈 **Thống kê**        | Biểu đồ Pie, Bar, Biến động Thu/Chi                 |
-| 💰 **Ngân sách**       | Đặt ngân sách theo danh mục                         |
-| � **Sổ Mua Sắm**       | Lên kế hoạch chi tiêu cho sự kiện                   |
-| 📥 **Xuất/Nhập**       | CSV, Excel, PDF, Google Sheets                      |
-| 📱 **Mobile-First**    | Giao diện tối ưu cho điện thoại                     |
-| 🌙 **Dark Mode**       | Giao diện sáng/tối                                  |
-| 🔐 **Bảo mật**         | Xác thực Google OAuth 2.0                           |
+| ---------------------- | ---------------------------------------------------- |
+| 📊 **Quản lý Thu Chi** | Phân loại danh mục 2 cấp, tuỳ chỉnh emoji & màu sắc   |
+| 💳 **Tài khoản thanh toán** | Tiền mặt, ngân hàng, ví điện tử — tự thêm/sửa/xoá |
+| 🤖 **Trợ lý AI**       | Thêm giao dịch & tra cứu dữ liệu bằng ngôn ngữ tự nhiên |
+| 📅 **Lịch Chi Tiêu**   | Xem giao dịch theo dạng calendar                      |
+| 📈 **Thống kê**        | Biểu đồ Pie, Bar, Biến động Thu/Chi                   |
+| 💰 **Ngân sách**       | Đặt ngân sách theo danh mục                           |
+| 🛍️ **Sổ Mua Sắm**      | Lên kế hoạch chi tiêu cho sự kiện                     |
+| 📥 **Xuất/Nhập**       | CSV, Excel, PDF (hỗ trợ tiếng Việt), Google Sheets    |
+| 🔔 **Thông báo**       | Thông báo trong app cho nhắc nhở, cảnh báo ngân sách  |
+| 📱 **Mobile-First**    | Giao diện tối ưu cho điện thoại                       |
+| 🌙 **Dark Mode**       | Giao diện sáng/tối                                    |
+| 🔐 **Bảo mật**         | Đăng nhập email/mật khẩu (OTP) hoặc Google, đổi mật khẩu, quản lý phiên đăng nhập |
 
 ---
 
@@ -33,8 +35,10 @@
 - **Styling**: Tailwind CSS 3.4
 - **UI Library**: Hero UI (formerly NextUI)
 - **Charts**: Recharts
-- **Backend**: Firebase (Authentication, Firestore)
-- **AI**: Google Generative AI SDK (@google/genai)
+- **Backend**: Express.js + PostgreSQL (repo riêng: `vi-vi-vu-api`), xác thực bằng
+  JWT (access token) + refresh token trong cookie httpOnly, đăng nhập email/mật khẩu
+  qua OTP hoặc Google Identity Services
+- **AI**: Gemini, gọi qua Backend (không cần API key phía client)
 - **Icons**: lucide-react
 - **Date**: date-fns
 
@@ -61,28 +65,25 @@ npm run build
 
 ## ⚙️ Cấu hình
 
-1. Tạo project trên [Firebase Console](https://console.firebase.google.com/)
-2. Bật Authentication với Google provider
-3. Tạo Firestore database
-4. Copy config vào file `.env`:
+Tạo file `.env` ở thư mục gốc với các biến sau:
 
 ```env
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
+# URL của Backend (vi-vi-vu-api), bao gồm prefix /api/v1
+VITE_API_BASE_URL=http://localhost:3000/api/v1
+
+# Google OAuth Client ID (loại "Web application"), dùng cho đăng nhập/liên kết Google
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
-5. (Optional) Lấy API Key Gemini từ [Google AI Studio](https://aistudio.google.com/) để dùng tính năng AI
+Backend cần chạy song song (xem README của repo `vi-vi-vu-api`) và Google Client ID
+phải nằm trong danh sách `GOOGLE_CLIENT_IDS` được cấu hình ở Backend.
 
 ---
 
 ## 📄 Legal
 
-- [Chính sách bảo mật](https://expensetracker-purchase.vercel.app/privacy-policy)
-- [Điều khoản dịch vụ](https://expensetracker-purchase.vercel.app/terms-of-service)
+- [Chính sách bảo mật](https://vivivu.vercel.app/privacy-policy)
+- [Điều khoản dịch vụ](https://vivivu.vercel.app/terms-of-service)
 
 ---
 

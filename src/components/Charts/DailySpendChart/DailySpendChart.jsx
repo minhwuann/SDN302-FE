@@ -39,9 +39,9 @@ const CustomTooltip = ({ active, payload }) => {
  * Component biểu đồ cột hiển thị chi tiêu theo ngày/tuần/tháng
  * Chỉ chứa UI, logic được xử lý bởi useDailyChartData hook
  */
-const DailySpendChart = ({ transactions, dateRange }) => {
+const DailySpendChart = ({ ledgerId, dateRange }) => {
   const { chartData, chartTitle, chartStyles } = useDailyChartData(
-    transactions,
+    ledgerId,
     dateRange
   );
 

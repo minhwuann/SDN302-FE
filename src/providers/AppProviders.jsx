@@ -5,6 +5,7 @@ import { TransactionsProvider } from "../contexts/TransactionsContext";
 import { BudgetProvider } from "../contexts/BudgetContext";
 import { DebtsProvider } from "../contexts/DebtsContext";
 import { ChallengesProvider } from "../contexts/ChallengesContext";
+import { NotificationProvider } from "../contexts/NotificationContext";
 
 /**
  * DataProviders - Các providers cần user đăng nhập
@@ -21,15 +22,17 @@ const DataProviders = ({ children }) => {
 
   // User đã đăng nhập, wrap children với các data providers
   return (
-    <CategoryProvider>
-      <TransactionsProvider>
-        <BudgetProvider>
-          <DebtsProvider>
-            <ChallengesProvider>{children}</ChallengesProvider>
-          </DebtsProvider>
-        </BudgetProvider>
-      </TransactionsProvider>
-    </CategoryProvider>
+    <NotificationProvider>
+      <CategoryProvider>
+        <TransactionsProvider>
+          <BudgetProvider>
+            <DebtsProvider>
+              <ChallengesProvider>{children}</ChallengesProvider>
+            </DebtsProvider>
+          </BudgetProvider>
+        </TransactionsProvider>
+      </CategoryProvider>
+    </NotificationProvider>
   );
 };
 

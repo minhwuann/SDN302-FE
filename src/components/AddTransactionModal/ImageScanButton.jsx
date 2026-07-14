@@ -1,74 +1,74 @@
 import { useRef, useState } from "react";
 import { Spinner } from "@heroui/react";
 import { Camera, AlertCircle } from "lucide-react";
-import { extractReceiptData, fileToBase64 } from "../../services/gemini";
-import { useGeminiKey } from "../../hooks/useGeminiKey";
+import * as aiApi from "../../services/aiApi";
+
+/** Chuyển File ảnh -> { base64, mimeType } (không kèm prefix "data:...;base64,"). */
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      resolve({ base64, mimeType: file.type });
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
 
 /**
  * Component khu vực quét hóa đơn/ảnh chuyển khoản
  * Thiết kế: Dashed border box với icon camera và helper text
- * Sử dụng Gemini Vision API để trích xuất thông tin giao dịch từ ảnh
+ * Dùng /api/v1/ai/receipt-scan của BE (Gemini key giữ ở server)
  *
- * @param {Function} onExtracted - Callback khi AI trích xuất xong, nhận data object
+ * @param {string} ledgerId - Sổ hiện tại (bắt buộc để BE xác thực + gợi ý danh mục/tài khoản)
+ * @param {Function} onExtracted - Callback khi AI trích xuất xong, nhận data object { amount, date, description, category }
  * @param {boolean} disabled - Vô hiệu hóa nút
  */
-const ImageScanButton = ({ onExtracted, disabled = false }) => {
+const ImageScanButton = ({ ledgerId, onExtracted, disabled = false }) => {
   const fileInputRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { apiKey, hasKey } = useGeminiKey();
 
   /**
    * Xử lý khi người dùng chọn file ảnh
-   * Gọi Gemini Vision API để trích xuất thông tin
+   * Gọi BE (/ai/receipt-scan) để trích xuất thông tin
    */
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset state
     setError("");
     setIsLoading(true);
 
     try {
-      // Kiểm tra API Key trước khi gọi API
-      if (!hasKey || !apiKey) {
-        throw new Error("API_KEY_REQUIRED");
+      if (!ledgerId) {
+        throw new Error("Vui lòng chọn sổ thu chi trước khi quét hóa đơn");
       }
 
-      // Kiểm tra file type
       if (!file.type.startsWith("image/")) {
         throw new Error("Vui lòng chọn file ảnh (jpg, png, webp)");
       }
 
-      // Chuyển file sang Base64
       const { base64, mimeType } = await fileToBase64(file);
+      const result = await aiApi.scanReceipt({
+        ledgerId,
+        imageBase64: base64,
+        mimeType,
+      });
 
-      // Gọi Gemini Vision API
-      const data = await extractReceiptData(base64, mimeType, apiKey);
+      if (result.missingFields?.length > 0 && result.clarification) {
+        setError(result.clarification);
+      }
 
-      if (data) {
-        // Gọi callback với dữ liệu đã trích xuất
-        onExtracted(data);
-      } else {
+      if (result.legacy?.amount) {
+        onExtracted(result.legacy);
+      } else if (!result.missingFields?.length) {
         throw new Error("Không thể trích xuất thông tin từ ảnh");
       }
     } catch (err) {
       console.error("Lỗi khi quét ảnh:", err);
-
-      // Xử lý các loại lỗi cụ thể
-      if (
-        err.message === "API_KEY_REQUIRED" ||
-        err.message?.includes("API Key not found")
-      ) {
-        setError("API_KEY_REQUIRED");
-      } else if (err.message?.includes("API_KEY_INVALID")) {
-        setError(
-          "API Key không hợp lệ. Vui lòng kiểm tra lại trong Trợ lý AI."
-        );
-      } else {
-        setError(err.message || "Có lỗi xảy ra khi xử lý ảnh");
-      }
+      setError(err.message || "Có lỗi xảy ra khi xử lý ảnh");
     } finally {
       setIsLoading(false);
       // Reset input để có thể chọn lại cùng file
@@ -82,10 +82,6 @@ const ImageScanButton = ({ onExtracted, disabled = false }) => {
    * Mở dialog chọn file khi click nút
    */
   const handleClick = () => {
-    if (!hasKey || !apiKey) {
-      setError("API_KEY_REQUIRED");
-      return;
-    }
     setError("");
     fileInputRef.current?.click();
   };
@@ -152,22 +148,9 @@ const ImageScanButton = ({ onExtracted, disabled = false }) => {
 
       {/* Hiển thị lỗi */}
       {error && (
-        <div className="flex flex-col items-center gap-2 text-xs text-danger bg-danger/10 py-3 px-3 rounded-lg">
-          <div className="flex items-center gap-1.5">
-            <AlertCircle size={14} />
-            {error === "API_KEY_REQUIRED" ? (
-              <span>Chưa có API Key. Vui lòng cấu hình trong Trợ lý AI.</span>
-            ) : (
-              <span>{error}</span>
-            )}
-          </div>
-          {error === "API_KEY_REQUIRED" && (
-            <span className="text-gray-600 dark:text-gray-400 text-center">
-              Nhấn nút{" "}
-              <strong className="text-primary-500">✨ Trợ lý AI</strong> ở thanh
-              điều hướng bên dưới để thêm API Key
-            </span>
-          )}
+        <div className="flex items-center gap-1.5 text-xs text-danger bg-danger/10 py-3 px-3 rounded-lg">
+          <AlertCircle size={14} className="flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
     </div>

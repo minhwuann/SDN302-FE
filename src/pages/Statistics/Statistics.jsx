@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OverviewPieChart from "../../components/Charts/OverviewPieChart/OverviewPieChart";
 import DailySpendChart from "../../components/Charts/DailySpendChart/DailySpendChart";
 import FluctuationChart from "../../components/Charts/FluctuationChart";
@@ -8,8 +8,8 @@ import ThemeButton from "../../components/ThemeButton";
 import { useTransactionsContext } from "../../contexts/TransactionsContext";
 import { useStatisticsFilter } from "./useStatisticsFilter";
 import TrendLineChart from "../../components/Charts/TrendLineChart/TrendLineChart";
-import { useState } from "react";
 import { Card, CardBody, CardHeader, ButtonGroup, Button } from "@heroui/react";
+import * as analyticsApi from "../../services/analyticsApi";
 import {
   BarChart3,
   TrendingUp,
@@ -65,26 +65,41 @@ const StatCard = ({
  * Hiển thị các biểu đồ phân tích thu chi
  */
 function Statistics() {
-  const { transactions, isLoading } = useTransactionsContext();
-  const { dateRange, setDateRange, filteredTransactions, dateRangeText } =
-    useStatisticsFilter(transactions);
+  const { isLoading, currentLedger } = useTransactionsContext();
+  const { dateRange, setDateRange, dateRangeText } = useStatisticsFilter();
   const [fluctuationMode, setFluctuationMode] = useState("daily");
 
-  // Tính toán số liệu thống kê
-  const stats = useMemo(() => {
-    const income = filteredTransactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0);
+  const ledgerId = currentLedger?.id;
+  const dateFrom = dateRange ? analyticsApi.toApiDate(dateRange.from) : undefined;
+  const dateTo = dateRange ? analyticsApi.toApiDate(dateRange.to) : undefined;
 
-    const expense = filteredTransactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => sum + t.amount, 0);
+  // Thẻ tổng quan: lấy từ BE (SQL aggregation), không tự tính từ transactions ở client
+  const [overview, setOverview] = useState(null);
+  useEffect(() => {
+    if (!ledgerId) return;
+    let active = true;
+    analyticsApi
+      .getOverview({ ledgerId, dateFrom, dateTo })
+      .then((data) => {
+        if (active) setOverview(data);
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải tổng quan thống kê:", err);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ledgerId, dateFrom, dateTo]);
 
-    const balance = income - expense;
-    const transactionCount = filteredTransactions.length;
-
-    return { income, expense, balance, transactionCount };
-  }, [filteredTransactions]);
+  const stats = useMemo(
+    () => ({
+      income: overview?.totalIncomeVnd || 0,
+      expense: overview?.totalExpenseVnd || 0,
+      balance: overview?.balanceVnd || 0,
+      transactionCount: overview?.transactionCount || 0,
+    }),
+    [overview]
+  );
 
   return (
     <div
@@ -164,13 +179,14 @@ function Statistics() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Biểu đồ tròn */}
-          <OverviewPieChart transactions={filteredTransactions} />
+          <OverviewPieChart
+            ledgerId={ledgerId}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+          />
 
           {/* Biểu đồ cột chi tiêu theo ngày */}
-          <DailySpendChart
-            transactions={filteredTransactions}
-            dateRange={dateRange}
-          />
+          <DailySpendChart ledgerId={ledgerId} dateRange={dateRange} />
         </div>
 
         {/* Section Header - Biến động */}
@@ -206,15 +222,12 @@ function Statistics() {
             </ButtonGroup>
           </CardHeader>
           <CardBody className="px-2 sm:px-6">
-            <FluctuationChart
-              transactions={transactions}
-              viewMode={fluctuationMode}
-            />
+            <FluctuationChart ledgerId={ledgerId} viewMode={fluctuationMode} />
           </CardBody>
         </Card>
 
         {/* Biểu đồ xu hướng */}
-        <TrendLineChart />
+        <TrendLineChart ledgerId={ledgerId} />
       </div>
     </div>
   );

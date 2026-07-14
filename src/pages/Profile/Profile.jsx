@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardBody,
@@ -8,50 +8,80 @@ import {
   Avatar,
   Divider,
   Switch,
+  Select,
+  SelectItem,
   Chip,
 } from "@heroui/react";
 import {
   User,
-  Key,
   Database,
   Save,
   Moon,
   Sun,
   LogOut,
   ChevronRight,
-  Eye,
-  EyeOff,
+  Bell,
+  Wallet,
+  Landmark,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { useGeminiKey } from "../../hooks/useGeminiKey";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Link } from "react-router-dom";
+import * as authApi from "../../services/authApi";
+import { renderGoogleButton, isGoogleConfigured } from "../../services/googleAuth";
+import SecuritySettings from "../../components/SecuritySettings/SecuritySettings";
+
+const GOOGLE_LINK_ERROR_MESSAGES = {
+  GOOGLE_ALREADY_LINKED: "Tài khoản này đã được liên kết với Google.",
+  GOOGLE_ACCOUNT_ALREADY_LINKED:
+    "Tài khoản Google này đã được liên kết với một tài khoản khác.",
+  GOOGLE_EMAIL_MISMATCH:
+    "Email của tài khoản Google phải trùng với email đăng nhập hiện tại.",
+};
+
+const LOCALE_OPTIONS = [
+  { key: "vi-VN", label: "Tiếng Việt" },
+  { key: "en-US", label: "English" },
+];
+
+const TIMEZONE_OPTIONS = [
+  { key: "Asia/Ho_Chi_Minh", label: "(GMT+7) Hà Nội, TP.HCM" },
+  { key: "Asia/Bangkok", label: "(GMT+7) Bangkok" },
+  { key: "UTC", label: "(GMT+0) UTC" },
+];
 
 /**
  * Trang Quản lý Tài khoản (Profile)
  * Cho phép user chỉnh sửa thông tin cá nhân, cấu hình API Key và cài đặt ứng dụng
  */
 const Profile = () => {
-  const { currentUser, updateUserProfile, logout } = useAuth();
-  const { apiKey, saveKey, removeKey, hasKey } = useGeminiKey();
+  const { currentUser, settings, updateUserProfile, logout, refreshUser } = useAuth();
   const { theme, setTheme } = useTheme();
+
+  const googleLinkBtnRef = useRef(null);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   // State cho form chỉnh sửa profile
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [locale, setLocale] = useState("vi-VN");
+  const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", content: "" });
 
-  // State cho API Key form
-  const [keyInput, setKeyInput] = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [showKey, setShowKey] = useState(false);
+  // State riêng cho từng toggle thông báo - lưu ngay khi bật/tắt (giống Theme)
+  const [savingSetting, setSavingSetting] = useState(null);
 
   useEffect(() => {
     if (currentUser) {
       setDisplayName(currentUser.displayName || "");
       setEmail(currentUser.email || "");
+      setAvatarUrl(currentUser.avatarUrl || "");
+      setLocale(currentUser.locale || "vi-VN");
+      setTimezone(currentUser.timezone || "Asia/Ho_Chi_Minh");
     }
   }, [currentUser]);
 
@@ -67,12 +97,20 @@ const Profile = () => {
 
     setLoading(true);
     try {
-      await updateUserProfile({ displayName: displayName });
+      await updateUserProfile({
+        displayName,
+        avatarUrl: avatarUrl.trim() || null,
+        locale,
+        timezone,
+      });
       setMessage({ type: "success", content: "Cập nhật hồ sơ thành công!" });
       setIsEditing(false);
     } catch (error) {
       console.error(error);
-      setMessage({ type: "error", content: "Lỗi khi cập nhật hồ sơ" });
+      setMessage({
+        type: "error",
+        content: error.message || "Lỗi khi cập nhật hồ sơ",
+      });
     } finally {
       setLoading(false);
       // Tự động ẩn thông báo sau 3s
@@ -80,25 +118,57 @@ const Profile = () => {
     }
   };
 
-  // Xử lý lưu API Key
-  const handleSaveKey = () => {
-    if (keyInput.trim()) {
-      saveKey(keyInput.trim());
-      setKeyInput("");
-      setShowKeyInput(false);
-      setMessage({ type: "success", content: "Đã lưu API Key thành công!" });
+  // Bật/tắt 1 loại thông báo - lưu ngay lên BE (PATCH /me), không cần bấm Lưu
+  const handleToggleSetting = async (key, value) => {
+    setSavingSetting(key);
+    try {
+      await updateUserProfile({ settings: { [key]: value } });
+    } catch (error) {
+      console.error(error);
+      setMessage({
+        type: "error",
+        content: error.message || "Lỗi khi cập nhật cài đặt thông báo",
+      });
       setTimeout(() => setMessage({ type: "", content: "" }), 3000);
+    } finally {
+      setSavingSetting(null);
     }
   };
 
-  // Xử lý xóa API Key
-  const handleRemoveKey = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa API Key này không?")) {
-      removeKey();
-      setMessage({ type: "success", content: "Đã xóa API Key" });
-      setTimeout(() => setMessage({ type: "", content: "" }), 3000);
-    }
-  };
+  // Render nút Google GIS cho luồng liên kết (chỉ khi chưa liên kết)
+  useEffect(() => {
+    if (currentUser?.googleSub) return;
+    if (!googleLinkBtnRef.current) return;
+    renderGoogleButton(
+      googleLinkBtnRef.current,
+      async (idToken) => {
+        try {
+          setLinkingGoogle(true);
+          await authApi.linkGoogleAccount(idToken);
+          await refreshUser();
+          setMessage({ type: "success", content: "Liên kết Google thành công!" });
+        } catch (error) {
+          console.error(error);
+          setMessage({
+            type: "error",
+            content:
+              GOOGLE_LINK_ERROR_MESSAGES[error?.code] ||
+              error?.message ||
+              "Không thể liên kết tài khoản Google.",
+          });
+        } finally {
+          setLinkingGoogle(false);
+          setTimeout(() => setMessage({ type: "", content: "" }), 3000);
+        }
+      },
+      (error) => {
+        setMessage({
+          type: "error",
+          content: error?.message || "Không thể liên kết tài khoản Google.",
+        });
+      }
+    );
+  }, [currentUser?.googleSub, refreshUser]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
@@ -141,7 +211,7 @@ const Profile = () => {
             {/* Avatar Section */}
             <div className="flex-shrink-0">
               <Avatar
-                src={currentUser?.photoURL}
+                src={avatarUrl || currentUser?.photoURL}
                 name={displayName}
                 className="w-24 h-24 text-2xl font-bold"
                 isBordered
@@ -174,6 +244,55 @@ const Profile = () => {
                   description="Email không thể thay đổi khi đăng nhập bằng Google"
                   className="opacity-70"
                 />
+                <Input
+                  label="Ảnh đại diện (URL)"
+                  placeholder="https://..."
+                  value={avatarUrl}
+                  onChange={(e) => {
+                    setAvatarUrl(e.target.value);
+                    setIsEditing(true);
+                  }}
+                  variant="bordered"
+                  labelPlacement="outside"
+                  radius="sm"
+                  description="Dán link ảnh có sẵn (Google, Imgur...)"
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Select
+                    label="Ngôn ngữ"
+                    variant="bordered"
+                    labelPlacement="outside"
+                    radius="sm"
+                    selectedKeys={[locale]}
+                    onSelectionChange={(keys) => {
+                      setLocale(Array.from(keys)[0] || "vi-VN");
+                      setIsEditing(true);
+                    }}
+                  >
+                    {LOCALE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.key} textValue={opt.label}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                  <Select
+                    label="Múi giờ"
+                    variant="bordered"
+                    labelPlacement="outside"
+                    radius="sm"
+                    selectedKeys={[timezone]}
+                    onSelectionChange={(keys) => {
+                      setTimezone(Array.from(keys)[0] || "Asia/Ho_Chi_Minh");
+                      setIsEditing(true);
+                    }}
+                  >
+                    {TIMEZONE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.key} textValue={opt.label}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </div>
               </div>
 
               {isEditing && (
@@ -192,124 +311,41 @@ const Profile = () => {
               )}
             </div>
           </div>
-        </CardBody>
-      </Card>
 
-      {/* 2. Cấu hình AI Assistant */}
-      <Card className="shadow-sm">
-        <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-              Cấu hình AI Assistant
-            </h2>
-          </div>
-          <Chip
-            color={hasKey ? "success" : "warning"}
-            variant="flat"
-            size="sm"
-            startContent={
-              hasKey ? (
-                <div className="w-2 h-2 rounded-full bg-green-500 ml-1" />
-              ) : null
-            }
-          >
-            {hasKey ? "Đã kết nối" : "Chưa cấu hình"}
-          </Chip>
-        </CardHeader>
-        <CardBody className="p-6">
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Để sử dụng các tính năng thông minh (Chat, Quét hóa đơn), bạn cần
-              cung cấp Google Gemini API Key. Key được lưu an toàn trên trình
-              duyệt của bạn.
-            </p>
+          <Divider />
 
-            {hasKey && !showKeyInput ? (
-              <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center flex-shrink-0">
-                    <Key className="w-5 h-5 text-purple-600 dark:text-purple-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-white">
-                      Gemini API Key
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-slate-500 truncate font-mono">
-                        {showKey ? apiKey : "**************************"}
-                      </p>
-                      <button
-                        onClick={() => setShowKey(!showKey)}
-                        className="text-slate-400 hover:text-purple-500 transition-colors"
-                        title={showKey ? "Ẩn Key" : "Hiện Key"}
-                      >
-                        {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    onPress={() => setShowKeyInput(true)}
-                  >
-                    Thay đổi
-                  </Button>
-                  <Button
-                    size="sm"
-                    color="danger"
-                    variant="light"
-                    onPress={handleRemoveKey}
-                  >
-                    Xóa
-                  </Button>
-                </div>
-              </div>
+          {/* Liên kết tài khoản Google */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-medium text-slate-800 dark:text-white">
+                Tài khoản Google
+              </p>
+              <p className="text-sm text-slate-500">
+                {currentUser?.googleSub
+                  ? "Bạn có thể đăng nhập bằng email/mật khẩu hoặc Google."
+                  : "Liên kết để có thể đăng nhập nhanh bằng Google."}
+              </p>
+            </div>
+            {currentUser?.googleSub ? (
+              <Chip
+                color="success"
+                variant="flat"
+                startContent={<CheckCircle2 className="w-4 h-4" />}
+              >
+                Đã liên kết với Google
+              </Chip>
+            ) : isGoogleConfigured() ? (
+              <div ref={googleLinkBtnRef} className={linkingGoogle ? "opacity-50 pointer-events-none" : ""} />
             ) : (
-              <div className="flex gap-2 items-end">
-                <Input
-                  label="Nhập API Key mới"
-                  placeholder="Paste key của bạn vào đây (AIza...)"
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  variant="bordered"
-                  labelPlacement="outside"
-                  className="flex-1"
-                  color="secondary"
-                  endContent={
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-secondary-500 hover:underline whitespace-nowrap"
-                    >
-                      Lấy Key ở đâu?
-                    </a>
-                  }
-                />
-                <div className="flex gap-2">
-                  <Button color="secondary" onPress={handleSaveKey}>
-                    Lưu Key
-                  </Button>
-                  {hasKey && (
-                    <Button
-                      variant="light"
-                      onPress={() => setShowKeyInput(false)}
-                      color="danger"
-                    >
-                      Hủy
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <p className="text-xs text-slate-400">
+                Đăng nhập Google chưa được cấu hình.
+              </p>
             )}
           </div>
         </CardBody>
       </Card>
 
-      {/* 3. Cài đặt Ứng dụng */}
+      {/* 2. Cài đặt Ứng dụng */}
       <Card className="shadow-sm">
         <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-100 dark:border-slate-700">
           <div className="flex items-center gap-2">
@@ -363,6 +399,84 @@ const Profile = () => {
               />
             </div>
 
+            {/* Nhắc nhở hàng ngày */}
+            <div className="flex items-center justify-between p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-white">
+                    Nhắc ghi chép hàng ngày
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Nhắc nếu bạn quên ghi chép thu chi trong ngày
+                  </p>
+                </div>
+              </div>
+              <Switch
+                isSelected={settings?.dailyReminderEnabled ?? false}
+                isDisabled={savingSetting === "dailyReminderEnabled"}
+                onValueChange={(value) =>
+                  handleToggleSetting("dailyReminderEnabled", value)
+                }
+                color="secondary"
+                size="md"
+              />
+            </div>
+
+            {/* Cảnh báo ngân sách */}
+            <div className="flex items-center justify-between p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400">
+                  <Wallet size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-white">
+                    Cảnh báo ngân sách
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Báo khi chi tiêu vượt ngưỡng cảnh báo của ngân sách
+                  </p>
+                </div>
+              </div>
+              <Switch
+                isSelected={settings?.budgetWarningEnabled ?? false}
+                isDisabled={savingSetting === "budgetWarningEnabled"}
+                onValueChange={(value) =>
+                  handleToggleSetting("budgetWarningEnabled", value)
+                }
+                color="secondary"
+                size="md"
+              />
+            </div>
+
+            {/* Nhắc nợ đến hạn */}
+            <div className="flex items-center justify-between p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                  <Landmark size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-white">
+                    Nhắc nợ đến hạn
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Báo khi khoản nợ/cho vay sắp hoặc đã đến hạn
+                  </p>
+                </div>
+              </div>
+              <Switch
+                isSelected={settings?.debtReminderEnabled ?? false}
+                isDisabled={savingSetting === "debtReminderEnabled"}
+                onValueChange={(value) =>
+                  handleToggleSetting("debtReminderEnabled", value)
+                }
+                color="secondary"
+                size="md"
+              />
+            </div>
+
             {/* Data Tools */}
             <div className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
               <div className="flex items-center gap-3">
@@ -391,6 +505,9 @@ const Profile = () => {
           </div>
         </CardBody>
       </Card>
+
+      {/* 3. Bảo mật */}
+      <SecuritySettings />
 
       {/* Logout Button */}
       <div className="flex justify-center pt-4">

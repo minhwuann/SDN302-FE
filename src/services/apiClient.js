@@ -9,12 +9,7 @@
  *    để AuthContext điều hướng về trang đăng nhập.
  */
 
-import {
-  getAccessToken,
-  getRefreshToken,
-  setTokens,
-  clearTokens,
-} from "./tokenStore";
+import { getAccessToken, setTokens, clearTokens } from "./tokenStore";
 
 /**
  * Chuẩn hoá base URL để tránh các lỗi cấu hình phổ biến:
@@ -78,20 +73,17 @@ let refreshPromise = null;
 
 /**
  * Gọi BE để xoay vòng access token bằng refresh token.
+ * Refresh token nằm trong cookie httpOnly (BE tự đọc/set), không còn ở JS.
  * Dùng chung 1 promise để tránh gọi refresh nhiều lần song song.
  */
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
 
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
   refreshPromise = (async () => {
     try {
       const response = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include",
       });
       const payload = await parseResponse(response);
       if (!response.ok || payload.error) {
@@ -140,6 +132,7 @@ async function request(method, path, options = {}, _retry = false) {
   const response = await fetch(`${BASE_URL}${path}${buildQuery(query)}`, {
     method,
     headers: finalHeaders,
+    credentials: "include",
     body:
       body === undefined
         ? undefined

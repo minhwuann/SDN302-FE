@@ -15,6 +15,7 @@ import { useAddTransactionForm } from "./useAddTransactionForm";
 import CategorySelector from "./CategorySelector";
 import BankSelector from "./BankSelector";
 import ImageScanButton from "./ImageScanButton";
+import { useTransactionsContext } from "../../contexts/TransactionsContext";
 
 /**
  * Component Modal thêm/sửa giao dịch
@@ -27,6 +28,8 @@ const AddTransactionModal = ({
   onUpdateTransaction,
   editingTransaction = null,
 }) => {
+  const { currentLedger } = useTransactionsContext();
+
   // Sử dụng hook để lấy logic và state
   const {
     formData,
@@ -73,12 +76,13 @@ const AddTransactionModal = ({
               {/* Khu vực quét hóa đơn - chỉ hiện khi thêm mới */}
               {!isEditMode && (
                 <ImageScanButton
+                  ledgerId={currentLedger?.id}
                   onExtracted={(data) => {
                     // Auto-fill form với dữ liệu từ AI
                     setFormData((prev) => ({
                       ...prev,
                       amount: data.amount
-                        ? formatAmountInput(String(data.amount))
+                        ? String(data.amount).replace(/\D/g, "")
                         : prev.amount,
                       date: data.date || prev.date,
                       note: data.description || prev.note,
@@ -139,24 +143,28 @@ const AddTransactionModal = ({
 
               {/* Số tiền */}
               <Input
-                type="text"
+                type="number"
                 label="Số tiền"
-                placeholder="Nhập số tiền"
+                placeholder="Nhập số tiền viết liền (VD: 50000)"
                 value={formData.amount}
-                onChange={(e) => {
-                  const inputValue = e.target.value;
-                  if (inputValue === "") {
+                onValueChange={(value) => {
+                  if (!value) {
                     setFormData({ ...formData, amount: "" });
                     setErrors({ ...errors, amount: "" });
                     return;
                   }
-                  const formatted = formatAmountInput(inputValue);
-                  setFormData({ ...formData, amount: formatted });
+                  const numericValue = value.replace(/\D/g, "");
+                  setFormData({ ...formData, amount: numericValue });
                   setErrors({ ...errors, amount: "" });
                 }}
                 variant="bordered"
                 isInvalid={!!errors.amount}
                 errorMessage={errors.amount}
+                description={
+                  formData.amount
+                    ? <span className="text-emerald-600 font-semibold text-sm">Thực tế: {formatAmountInput(formData.amount)} VND</span>
+                    : null
+                }
                 endContent={
                   <span className="text-gray-500 dark:text-gray-400 font-medium">
                     VND

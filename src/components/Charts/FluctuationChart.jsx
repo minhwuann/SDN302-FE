@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -17,6 +17,8 @@ import {
   subMonths,
 } from "date-fns";
 import { vi } from "date-fns/locale";
+import * as analyticsApi from "../../services/analyticsApi";
+import { useTransactionsContext } from "../../contexts/TransactionsContext";
 
 // Format tiền VND - không dùng style:currency để tránh hiển thị "đ"
 const formatCurrency = (value) => {
@@ -74,12 +76,42 @@ const CustomTooltipContent = ({ active, payload, label, viewMode }) => {
 
 /**
  * Biểu đồ Biến động Thu Chi
- * Hiển thị so sánh thu nhập vs chi tiêu theo từng ngày/tháng
- * @param {Array} transactions - Mảng giao dịch
+ * Hiển thị so sánh thu nhập vs chi tiêu theo từng ngày (tháng hiện tại)
+ * hoặc theo tháng (6 tháng gần nhất).
+ * Theo tháng: nguồn /analytics/monthly-trend (SUM sẵn ở BE).
+ * Theo ngày: BE không có endpoint thu+chi theo ngày, nên tự tính từ
+ * transactions đã tải sẵn ở client (TransactionsContext).
+ * @param {string} ledgerId
  * @param {string} viewMode - 'daily' hoặc 'monthly'
  */
-const FluctuationChart = ({ transactions, viewMode = "daily" }) => {
-  // Xử lý dữ liệu theo ngày trong tháng hiện tại
+const FluctuationChart = ({ ledgerId, viewMode = "daily" }) => {
+  const { transactions } = useTransactionsContext();
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
+
+  // Tải xu hướng theo tháng (6 tháng gần nhất)
+  useEffect(() => {
+    if (!ledgerId) return undefined;
+    let active = true;
+    const now = new Date();
+    analyticsApi
+      .getMonthlyTrend({
+        ledgerId,
+        dateFrom: analyticsApi.toApiDate(startOfMonth(subMonths(now, 5))),
+        dateTo: analyticsApi.toApiDate(endOfMonth(now)),
+      })
+      .then((data) => {
+        if (active) setMonthlyTrend(data);
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải biến động theo tháng:", err);
+        if (active) setMonthlyTrend([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ledgerId]);
+
+  // Gộp dữ liệu theo ngày trong tháng hiện tại (từ transactions đã tải sẵn), lấp khoảng trống bằng 0
   const dailyData = useMemo(() => {
     const now = new Date();
     const start = startOfMonth(now);
@@ -93,7 +125,6 @@ const FluctuationChart = ({ transactions, viewMode = "daily" }) => {
       const income = dayTransactions
         .filter((tx) => tx.type === "income")
         .reduce((sum, tx) => sum + tx.amount, 0);
-
       const expense = dayTransactions
         .filter((tx) => tx.type === "expense")
         .reduce((sum, tx) => sum + tx.amount, 0);
@@ -108,38 +139,30 @@ const FluctuationChart = ({ transactions, viewMode = "daily" }) => {
     });
   }, [transactions]);
 
-  // Xử lý dữ liệu theo tháng (6 tháng gần nhất)
+  // Gộp dữ liệu theo tháng (6 tháng gần nhất), lấp khoảng trống bằng 0
   const monthlyData = useMemo(() => {
     const now = new Date();
+    const byMonthKey = new Map(
+      monthlyTrend.map((m) => [m.month.slice(0, 7), m])
+    );
     const months = [];
 
     for (let i = 5; i >= 0; i--) {
       const monthDate = subMonths(now, i);
       const monthKey = format(monthDate, "yyyy-MM");
-
-      const monthTransactions = transactions.filter((tx) =>
-        tx.date?.startsWith(monthKey)
-      );
-
-      const income = monthTransactions
-        .filter((tx) => tx.type === "income")
-        .reduce((sum, tx) => sum + tx.amount, 0);
-
-      const expense = monthTransactions
-        .filter((tx) => tx.type === "expense")
-        .reduce((sum, tx) => sum + tx.amount, 0);
+      const row = byMonthKey.get(monthKey);
 
       months.push({
         date: format(monthDate, "T.MM", { locale: vi }),
         fullDate: monthKey,
-        "Thu nhập": income,
-        "Chi tiêu": expense,
-        balance: income - expense,
+        "Thu nhập": row?.totalIncomeVnd || 0,
+        "Chi tiêu": row?.totalExpenseVnd || 0,
+        balance: row?.balanceVnd || 0,
       });
     }
 
     return months;
-  }, [transactions]);
+  }, [monthlyTrend]);
 
   const data = viewMode === "daily" ? dailyData : monthlyData;
 
