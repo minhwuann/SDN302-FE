@@ -15,12 +15,28 @@
 
 @layer base {
   :root {
-    /* Token tham chiếu (đồng bộ với tailwind.config.js) */
+    /* Token tham chiếu */
     --vvv-app-bg: #f6f8fb;
     --vvv-surface: #ffffff;
     --vvv-surface-2: #f0f4f8;
     --vvv-border: #e2e8f0;
     --vvv-primary: #2563eb;
+  }
+  .dark {
+    --vvv-border: #263244;
+  }
+
+  /*
+   * Tailwind v4 đổi màu border mặc định thành currentColor (đen) — khác v3.
+   * Khôi phục màu border mặc định = divider để border chưa set màu (vd input
+   * HeroUI) KHÔNG bị đen. Các class border-<color> tường minh vẫn ghi đè bình thường.
+   */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--vvv-border);
   }
 
   html {
@@ -72,7 +88,11 @@ input[type="password"]::-ms-reveal {
 }
 
 :focus-visible {
-  outline: 2px solid var(--vvv-primary);
+  /* Dùng longhand + màu literal để Tailwind v4 không strip mất outline-color
+     (tránh outline đen do rơi về currentColor). */
+  outline-width: 2px;
+  outline-style: solid;
+  outline-color: #2563eb;
   outline-offset: 2px;
   border-radius: 4px;
 }
